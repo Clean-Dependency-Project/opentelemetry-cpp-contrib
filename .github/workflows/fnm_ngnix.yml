@@ -1,0 +1,54 @@
+name: FNM ngnix module CI
+
+on:
+  workflow_dispatch:
+
+jobs:
+  ngnix-build-test-ubuntu:
+    name: webserver-ngnix-amazonlinux2-build
+    runs-on: ubuntu-20.04
+    steps:
+      - name: checkout otel webserver
+        uses: actions/checkout@v4
+
+      - name: cache docker layers
+        uses: actions/cache@v3
+        with:
+          path: /tmp/buildx-cache/
+          key: apache-amazonlinux2-${{ github.sha }}
+          restore-keys: |
+            apache-amazonlinux2
+           
+      - name: setup docker image
+        run: |
+          # cd instrumentation/otel-webserver-module
+           # docker build -t nginx_amazonlinux2:latest -f ./docker/amazonlinux2/Dockerfile 
+          sudo curl -L "https://github.com/docker/compose/releases/download/1.29.2/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+          sudo chmod +x /usr/local/bin/docker-compose
+          cd instrumentation/otel-webserver-module
+          docker-compose --profile amazonlinux2_nginx build
+          docker-compose --profile amazonlinux2_nginx up --detach
+          
+      - name: build
+        run: |
+          docker ps
+          #docker run -d nginx_amazonlinux2:latest
+          #docker exec nginx_amazonlinux2 bash -c              \
+          #   'tar -cvzf /otel-webserver-module/build/result.tar.gz /otel-webserver-module/build/* '
+          mkdir /tmp/build
+          docker cp $(docker inspect --format="{{.Id}}" nginx_amazonlinux2):/otel-webserver-module/build/opentelemetry-webserver-sdk-x64-linux.tgz /tmp/build
+          ls -l /tmp/build
+          pwd
+            
+      - name: Change permissions
+        run: |
+          sudo chmod -R 777 /tmp/build
+          
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: result-artifact
+          path: /tmp/build/opentelemetry-webserver-sdk-x64-linux.tgz
+
+
+          
