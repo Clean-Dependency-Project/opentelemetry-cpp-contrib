@@ -2067,7 +2067,7 @@ static void fillRequestPayload(request_payload* req_payload, ngx_http_request_t*
     } else {
         strcpy(temp_user_agent,defusragnt);
     }
-    temp_user_agent[r->headers_in.user_agent->value.len]='\0';
+    temp_user_agent[usragntlen-1]='\0';
     req_payload->user_agent = temp_user_agent;
 
     ngx_uint_t remote_port = 0;
