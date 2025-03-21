@@ -2055,13 +2055,17 @@ static void fillRequestPayload(request_payload* req_payload, ngx_http_request_t*
     strcpy(temp_request_method,(const char*)(r->method_name).data);
     temp_request_method[(r->method_name).len]='\0';
     req_payload->request_method = temp_request_method;
-
+    
+    int usragntlen=5;
+    char defusragnt[5] = "None";
     if(r->headers_in.user_agent != NULL) {
-         char *temp_user_agent = ngx_pcalloc(r->pool, r->headers_in.user_agent->value.len +1);
+        usragntlen=r->headers_in.user_agent->value.len +1;
+    }
+    char *temp_user_agent = ngx_pcalloc(r->pool, usragntlen);
+    if(r->headers_in.user_agent != NULL) {
         strcpy(temp_user_agent,(const char*)(r->headers_in.user_agent->value.data));
     } else {
-        char *temp_user_agent = ngx_pcalloc(r->pool, 5);
-        strcpy(temp_user_agent,"None");
+        strcpy(temp_user_agent,defusragnt);
     }
     temp_user_agent[r->headers_in.user_agent->value.len]='\0';
     req_payload->user_agent = temp_user_agent;
