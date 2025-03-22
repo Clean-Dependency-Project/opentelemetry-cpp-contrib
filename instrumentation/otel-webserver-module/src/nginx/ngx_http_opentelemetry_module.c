@@ -2055,11 +2055,20 @@ static void fillRequestPayload(request_payload* req_payload, ngx_http_request_t*
     strcpy(temp_request_method,(const char*)(r->method_name).data);
     temp_request_method[(r->method_name).len]='\0';
     req_payload->request_method = temp_request_method;
-
-    //char *temp_user_agent = ngx_pcalloc(r->pool, r->headers_in.user_agent->value.len +1);
-    //strcpy(temp_user_agent,(const char*)(r->headers_in.user_agent->value.data));
-    //temp_user_agent[r->headers_in.user_agent->value.len]='\0';
-    //req_payload->user_agent = temp_user_agent;
+    
+    int usragntlen=5;
+    char defusragnt[5] = "None";
+    if(r->headers_in.user_agent != NULL) {
+        usragntlen=r->headers_in.user_agent->value.len +1;
+    }
+    char *temp_user_agent = ngx_pcalloc(r->pool, usragntlen);
+    if(r->headers_in.user_agent != NULL) {
+        strcpy(temp_user_agent,(const char*)(r->headers_in.user_agent->value.data));
+    } else {
+        strcpy(temp_user_agent,defusragnt);
+    }
+    temp_user_agent[usragntlen-1]='\0';
+    req_payload->user_agent = temp_user_agent;
 
     ngx_uint_t remote_port = 0;
     if (r->connection != NULL) {
