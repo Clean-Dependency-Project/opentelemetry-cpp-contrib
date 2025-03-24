@@ -26,7 +26,7 @@ ARG AUTOMAKE_VERSION="1.16.3"
 ARG PERL_VERSION="5.20.2"
 ARG PERL_CPANVERSION="5.0"
 ARG PCRE_VERSION="8.44"
-ARG NGINX_VERSION="1.27.3"
+ARG NGINX_VERSION="1.27.4"
 
 # create default non-root user
 RUN groupadd -r swuser && useradd -u 1000 -g swuser -m -s /sbin/nologin -c "default non-root user" swuser
@@ -283,10 +283,10 @@ RUN echo "[nginx]" > /etc/yum.repos.d/nginx.repo && \
 # Install necessary tools
 RUN dnf install -y wget && dnf clean all
 
-# Download and install Nginx 1.27.3 from the correct path
-RUN wget https://nginx.org/packages/mainline/centos/8/x86_64/RPMS/nginx-1.27.3-1.el8.ngx.x86_64.rpm && \
-    dnf install -y ./nginx-1.27.3-1.el8.ngx.x86_64.rpm && \
-    rm -f nginx-1.27.3-1.el8.ngx.x86_64.rpm && \
+# Download and install Nginx 1.27.4 from the correct path
+RUN wget https://nginx.org/packages/mainline/centos/8/x86_64/RPMS/nginx-1.27.4-1.el8.ngx.x86_64.rpm && \
+    dnf install -y ./nginx-1.27.4-1.el8.ngx.x86_64.rpm && \
+    rm -f nginx-1.27.4-1.el8.ngx.x86_64.rpm && \
     dnf clean all
 
 
@@ -302,7 +302,7 @@ RUN cd /otel-webserver-module/build \
     && cd /
 
 RUN cp /otel-webserver-module/conf/nginx/opentelemetry_module.conf /opt/ \
-    && sed -i '8i load_module /opt/opentelemetry-webserver-sdk/WebServerModule/Nginx/1.27.3/ngx_http_opentelemetry_module.so;' /etc/nginx/nginx.conf \
+    && sed -i '8i load_module /opt/opentelemetry-webserver-sdk/WebServerModule/Nginx/1.27.4/ngx_http_opentelemetry_module.so;' /etc/nginx/nginx.conf \
     && sed -i '33i include /opt/opentelemetry_module.conf;' /etc/nginx/nginx.conf \ 
     && cd /
 

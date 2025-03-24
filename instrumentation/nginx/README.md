@@ -27,7 +27,7 @@ cmake -DCMAKE_POSITION_INDEPENDENT_CODE=ON ..
 ```
 mkdir build
 cd build
-cmake -DNGINX_VERSION=1.27.3 ..
+cmake -DNGINX_VERSION=1.27.4 ..
 make
 ```
 
