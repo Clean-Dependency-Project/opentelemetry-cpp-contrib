@@ -6,7 +6,7 @@ on:
 jobs:
   webserver-build-test-centos8:
     name: webserver-centos8-build
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
     steps:
       - name: checkout otel webserver
         uses: actions/checkout@v4
