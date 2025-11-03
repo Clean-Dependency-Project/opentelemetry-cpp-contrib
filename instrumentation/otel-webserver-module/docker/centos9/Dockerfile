@@ -8,10 +8,10 @@ ENV GOSU_ARCH amd64
 ENV JDK_ARCH x64
 
 ARG PYTHON_VERSION="2.7.8"
-ARG CMAKE_VERSION="3.20"
-ARG CMAKE_0VERSION="3.20.0"
+ARG CMAKE_VERSION="3.26"
+ARG CMAKE_0VERSION="3.26.5"
 ARG GRPC_VERSION="1.36.4"
-ARG OPENTELEMETRY_VERSION="1.2.0"
+ARG OPENTELEMETRY_VERSION="1.23.0"
 ARG BOOST_VERSION="1.75.0"
 ARG BOOST_FILENAME="boost_1_75_0"
 ARG APR_VERSION="1.7.0"
@@ -58,7 +58,7 @@ RUN yum install -y epel-release && \
 RUN dnf install -y gcc-toolset-14 && \
     dnf clean all
 
-ENV PATH="/opt/rh/gcc-toolset-9/root/usr/bin:${PATH}"
+ENV PATH="/opt/rh/gcc-toolset-14/root/usr/bin:${PATH}"
 
 # install python 2.7.8
 RUN wget http://www.python.org/ftp/python/${PYTHON_VERSION}/Python-${PYTHON_VERSION}.tar.xz \
@@ -92,18 +92,7 @@ RUN wget https://cmake.org/files/v${CMAKE_VERSION}/cmake-${CMAKE_0VERSION}-linux
   && cp -rf * /usr/local/ \
   && cd .. && rm -rf cmake-${CMAKE_0VERSION}-linux-x86_64.tar.gz
 
-# install grpc. If planning to upgrade, make sure sed command works
-RUN git clone https://github.com/grpc/grpc \
-  && cd grpc \
-  && git checkout tags/v${GRPC_VERSION} -b v${GRPC_VERSION} \
-  && git submodule update --init \
-  && sed -i "s/target_link_libraries(bssl ssl crypto)/target_link_libraries(bssl ssl crypto rt)/g" third_party/boringssl-with-bazel/CMakeLists.txt \
-  && mkdir -p cmake/build \
-  && cd cmake/build \
-  && cmake ../.. -DgRPC_INSTALL=ON -DCMAKE_BUILD_TYPE=Release -DgRPC_ABSL_PROVIDER=module -DgRPC_CARES_PROVIDER=module -DgRPC_PROTOBUF_PROVIDER=module -DgRPC_RE2_PROVIDER=module -DgRPC_SSL_PROVIDER=module -DgRPC_ZLIB_PROVIDER=module \
-  && make \
-  && make install \
-  && cd ../../..
+
 
 # Create dependencies folder to store all dependencies.
 RUN mkdir -p dependencies
@@ -282,6 +271,7 @@ RUN dnf install -y wget && dnf clean all
 
 # Download and install Nginx 1.29.3 from the correct path
 RUN wget https://nginx.org/packages/mainline/centos/8/x86_64/RPMS/nginx-1.29.3-1.el9.ngx.x86_64.rpm && \
+
     dnf install -y ./nginx-1.29.3-1.el9.ngx.x86_64.rpm && \
     rm -f nginx-1.29.3-1.el9.ngx.x86_64.rpm && \
     dnf clean all
