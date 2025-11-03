@@ -2,6 +2,11 @@ name: webserver centos9
 
 on:
   workflow_dispatch:
+  push:
+    branches: "*"
+    paths:
+      - 'instrumentation/otel-webserver-module/**'
+      - '.github/workflows/webserver-centos9.yml'
 
 jobs:
   webserver-build-test-centos9:
