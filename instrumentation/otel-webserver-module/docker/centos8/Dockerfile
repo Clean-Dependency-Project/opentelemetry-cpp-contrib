@@ -27,6 +27,7 @@ ARG PERL_VERSION="5.20.2"
 ARG PERL_CPANVERSION="5.0"
 ARG PCRE_VERSION="8.44"
 ARG NGINX_VERSION="1.29.3"
+ARG GCC_TOOLSET="14"
 
 # create default non-root user
 RUN groupadd -r swuser && useradd -u 1000 -g swuser -m -s /sbin/nologin -c "default non-root user" swuser
@@ -58,10 +59,10 @@ RUN yum install -y epel-release && \
 
 
 # install devtoolset toolchain
-RUN dnf install -y gcc-toolset-9 && \
+RUN dnf install -y gcc-toolset-${GCC_TOOLSET} && \
     dnf clean all
 
-ENV PATH="/opt/rh/gcc-toolset-9/root/usr/bin:${PATH}"
+ENV PATH="/opt/rh/gcc-toolset-${GCC_TOOLSET}/root/usr/bin:${PATH}"
 
 # install python 2.7.8
 RUN wget http://www.python.org/ftp/python/${PYTHON_VERSION}/Python-${PYTHON_VERSION}.tar.xz \

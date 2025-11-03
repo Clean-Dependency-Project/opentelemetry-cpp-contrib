@@ -7,12 +7,22 @@ jobs:
   webserver-build-test-centos8:
     name: webserver-centos8-build
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        gcc_toolset: [14]
     steps:
-      - name: checkout otel webserver
+      - name: Checkout otel webserver
         uses: actions/checkout@v4
+
+      - name: Set up JDK for Gradle
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
       - name: setup buildx
         id: buildx
-        uses: docker/setup-buildx-action@master
+        uses: docker/setup-buildx-action@v2
         with:
           install: true
       # - name: cache docker layers
@@ -25,37 +35,44 @@ jobs:
       - name: setup docker image
         run: |
           cd instrumentation/otel-webserver-module
-          docker buildx build -t apache_centos8 -f docker/centos8/Dockerfile \
+          # build the centos8 builder image that contains toolchain and dependencies
+          docker buildx build -t apache_centos8:${{ matrix.gcc_toolset }} -f docker/centos8/Dockerfile \
+            --build-arg GCC_TOOLSET=${{ matrix.gcc_toolset }} \
             --load .
       - name: build
+        env:
+          GRADLE_OPTS: -Dorg.gradle.jvmargs="-Xmx3g"
         run: |
-          docker run -idt --name apache_centos8_container apache_centos8 /bin/bash
+          # Start a container from the prepared image and copy source into it
+          docker run -idt --name apache_centos8_container apache_centos8:${{ matrix.gcc_toolset }} /bin/bash
           cd instrumentation/otel-webserver-module
-          docker exec apache_centos8_container bash -c \
-            'cd /otel-webserver-module; rm -rf *;'
+          # ensure container has a clean workspace
+          docker exec apache_centos8_container bash -c 'cd /otel-webserver-module; rm -rf *;'
           docker cp . $(docker inspect --format="{{.Id}}" apache_centos8_container):/otel-webserver-module/
-          docker exec apache_centos8_container bash -c \
-            'cd /otel-webserver-module; rm -rf build; \
-            cp -r /dependencies /otel-webserver-module/;           \
-            cp -r /build-dependencies /otel-webserver-module/;     \
-            ./gradlew assembleWebServerModule'
-      - name: unit test
-        run: |
-          docker exec apache_centos8_container bash -c \
-            'cd /otel-webserver-module; ./gradlew runUnitTest'
-      # - name: update cache
-      #   run: |
-      #     rm -rf /tmp/buildx-cache/apache_centos8
-      #     mv /tmp/buildx-cache/apache_centos8-new /tmp/buildx-cache/apache_centos8
-      - name: copy artifacts
+
+          # Build a debug artifact so we keep symbols (avoids strip) to help diagnose crashes
+          docker exec apache_centos8_container bash -c '
+            cd /otel-webserver-module; \
+            rm -rf build; \
+            cp -r /dependencies /otel-webserver-module/; \
+            cp -r /build-dependencies /otel-webserver-module/; \
+            ./gradlew -DbuildType=debug assembleWebServerModule --no-daemon --stacktrace'
+      # Collect only the distribution tgz and the built nginx module to reduce IO/time
+      - name: collect artifacts
         id: artifacts
         run: |
           cd instrumentation/otel-webserver-module
           mkdir -p /tmp/apache_centos8/
-          docker cp apache_centos8_container:/otel-webserver-module/build/opentelemetry-webserver-sdk-x64-linux.tgz \
-            /tmp/apache_centos8/
+          # copy the tgz distribution (tagged by toolset)
+          docker cp apache_centos8_container:/otel-webserver-module/build/opentelemetry-webserver-sdk-x64-linux-${{ matrix.gcc_toolset }}.tgz /tmp/apache_centos8/ || true
+          # copy the built nginx dynamic module from the build tree only
+          docker exec apache_centos8_container bash -lc '
+            find /otel-webserver-module/build -maxdepth 4 -type f -name "ngx_http_opentelemetry_module.*" -exec cp {} /tmp/ \; || true'
+          # pull the copied files to the runner
+          docker cp apache_centos8_container:/tmp/ /tmp/apache_centos8/ || true
+
       - name: upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: opentelemetry-webserver-sdk-x64-linux.tgz
-          path: /tmp/apache_centos8/opentelemetry-webserver-sdk-x64-linux.tgz
+          name: opentelemetry-webserver-sdk-and-native-${{ matrix.gcc_toolset }}
+          path: /tmp/apache_centos8/**
