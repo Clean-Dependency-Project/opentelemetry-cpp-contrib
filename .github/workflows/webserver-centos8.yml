@@ -9,7 +9,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        gcc_toolset: [14]
+        gcc_toolset: [14.2]
     steps:
       - name: Checkout otel webserver
         uses: actions/checkout@v4
