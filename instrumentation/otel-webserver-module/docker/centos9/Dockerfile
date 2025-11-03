@@ -58,7 +58,7 @@ RUN yum install -y epel-release && \
 
 
 # install devtoolset toolchain
-RUN dnf install -y gcc-toolset-9 && \
+RUN dnf install -y gcc-toolset-14 && \
     dnf clean all
 
 ENV PATH="/opt/rh/gcc-toolset-9/root/usr/bin:${PATH}"
@@ -275,7 +275,7 @@ RUN cp -r /dependencies /otel-webserver-module/ \
 # Add the Nginx repository
 RUN echo "[nginx]" > /etc/yum.repos.d/nginx.repo && \
     echo "name=nginx repo" >> /etc/yum.repos.d/nginx.repo && \
-    echo "baseurl=https://nginx.org/packages/mainline/centos/8/x86_64/" >> /etc/yum.repos.d/nginx.repo && \
+    echo "baseurl=https://nginx.org/packages/mainline/centos/9/x86_64/" >> /etc/yum.repos.d/nginx.repo && \
     echo "gpgcheck=1" >> /etc/yum.repos.d/nginx.repo && \
     echo "enabled=1" >> /etc/yum.repos.d/nginx.repo && \
     rpm --import https://nginx.org/keys/nginx_signing.key
@@ -284,9 +284,9 @@ RUN echo "[nginx]" > /etc/yum.repos.d/nginx.repo && \
 RUN dnf install -y wget && dnf clean all
 
 # Download and install Nginx 1.29.3 from the correct path
-RUN wget https://nginx.org/packages/mainline/centos/8/x86_64/RPMS/nginx-1.29.3-1.el8.ngx.x86_64.rpm && \
-    dnf install -y ./nginx-1.29.3-1.el8.ngx.x86_64.rpm && \
-    rm -f nginx-1.29.3-1.el8.ngx.x86_64.rpm && \
+RUN wget https://nginx.org/packages/mainline/centos/8/x86_64/RPMS/nginx-1.29.3-1.el9.ngx.x86_64.rpm && \
+    dnf install -y ./nginx-1.29.3-1.el9.ngx.x86_64.rpm && \
+    rm -f nginx-1.29.3-1.el9.ngx.x86_64.rpm && \
     dnf clean all
 
 
