@@ -1,4 +1,4 @@
-FROM centos:9
+FROM centos9
 
 ARG BUILD_NUMBER
 
