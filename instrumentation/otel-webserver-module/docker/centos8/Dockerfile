@@ -205,24 +205,35 @@ RUN mkdir -p dependencies/apache-log4cxx/${LOG4CXX_VERSION} \
     && cd .. && rm -rf apache-log4cxx-${LOG4CXX_VERSION}.tar.gz && rm -rf apache-log4cxx-${LOG4CXX_VERSION}
 
 # install opentelemetry
+
 RUN mkdir -p dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/lib \
     && mkdir -p dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/include \
     && git clone https://github.com/open-telemetry/opentelemetry-cpp \
-    && cd opentelemetry-cpp/ \
+    && cd opentelemetry-cpp \
     && git checkout tags/v${OPENTELEMETRY_VERSION} -b v${OPENTELEMETRY_VERSION} \
     && git submodule update --init --recursive \
     && mkdir build \
     && cd build \
-    && cmake .. -DCMAKE_POSITION_INDEPENDENT_CODE=ON -DBUILD_TESTING=OFF -DBUILD_SHARED_LIBS=ON -DWITH_OTLP=ON -DCMAKE_INSTALL_PREFIX=/dependencies/opentelemetry/${OPENTELEMETRY_VERSION} \
+    && cmake .. \
+        -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
+        -DBUILD_TESTING=OFF \
+        -DBUILD_SHARED_LIBS=ON \
+        -DWITH_OTLP=ON \
+        -DCMAKE_INSTALL_PREFIX=/dependencies/opentelemetry/${OPENTELEMETRY_VERSION} \
     && cmake --build . --target all \
+    && cmake --install . \
     && cd .. \
-    && find . -name "*.so" -type f -exec cp {} /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/lib/ \; \
-    && cp build/libopentelemetry_proto.a /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/lib \
+    # Copy shared libraries (.so)
+    && find build -name "*.so" -type f -exec cp {} /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/lib/ \; \
+    # Copy headers
     && cp -r api/include/ /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/ \
     && for dir in exporters/*; do if [ -d "$dir" ]; then cp -rf "$dir/include" /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/; fi; done \
     && cp -r sdk/include/ /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/ \
-    && cp -r build/generated/third_party/opentelemetry-proto/opentelemetry/proto/ /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/include/opentelemetry/ \
+    # Copy generated proto headers
+    && cp -r build/generated/third_party/opentelemetry-proto/opentelemetry/proto/ \
+       /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/include/opentelemetry/ \
     && cd .. && rm -rf opentelemetry-cpp
+
 
 # install googletest
 RUN mkdir -p dependencies/googletest/${GTEST_VERSION}/ \
