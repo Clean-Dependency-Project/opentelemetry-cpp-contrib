@@ -62,7 +62,9 @@ RUN dnf install -y gcc-toolset-9 && \
     dnf clean all
 
 ENV PATH="/opt/rh/gcc-toolset-9/root/usr/bin:${PATH}"
-
+# install git required for grpc
+RUN yum install git -y \
+  && yum clean all
 # install opentelemetry
 
 # Install OpenTelemetry C++ SDK
