@@ -111,12 +111,68 @@ RUN git clone https://github.com/grpc/grpc \
 # Create dependencies folder to store all dependencies.
 RUN mkdir -p dependencies
 
+# install boost version 1.75.0
+#RUN wget https://boostorg.jfrog.io/artifactory/main/release/${BOOST_VERSION}/source/${BOOST_FILENAME}_rc1.tar.gz \
+RUN wget https://archives.boost.io/release/${BOOST_VERSION}/source/${BOOST_FILENAME}.tar.gz \
+    # && tar -xvf ${BOOST_FILENAME}_rc1.tar.gz \
+    && tar -xvf ${BOOST_FILENAME}.tar.gz \
+    && cd ${BOOST_FILENAME} \
+    && ./bootstrap.sh --with-libraries=filesystem,system --prefix=/dependencies/boost/${BOOST_VERSION}/ \
+    && ./b2 install define=BOOST_ERROR_CODE_HEADER_ONLY link=static threading=multi cxxflags="-fvisibility=hidden -fPIC" cflags="-fvisibility=hidden -fPIC" \
+    # && cd .. && rm -rf ${BOOST_FILENAME} && rm ${BOOST_FILENAME}_rc1.tar.gz
+    && cd .. && rm -rf ${BOOST_FILENAME} && rm ${BOOST_FILENAME}.tar.gz
+
+#install Apr
+RUN mkdir -p dependencies/apr/${APR_VERSION} \
+    && wget https://archive.apache.org/dist/apr/apr-${APR_VERSION}.tar.gz --no-check-certificate \
+    && tar -xf apr-${APR_VERSION}.tar.gz \
+    && cd apr-${APR_VERSION} \
+    && ./configure --prefix=/dependencies/apr/${APR_VERSION} --enable-static=yes --enable-shared=no --with-pic && echo $? \
+    && make -j 6 \
+    && make install \
+    && cd ../ && rm -rf apr-${APR_VERSION} && rm -rf apr-${APR_VERSION}.tar.gz
+
+# install libexpat
+RUN mkdir -p dependencies/expat/${EXPAT_VERSION} \
+    && wget https://github.com/libexpat/libexpat/releases/download/${EXPAT_RVERSION}/expat-${EXPAT_VERSION}.tar.gz --no-check-certificate \
+    && tar -xf expat-${EXPAT_VERSION}.tar.gz \
+    && cd expat-${EXPAT_VERSION} \
+    && ./configure --prefix=/dependencies/expat/${EXPAT_VERSION} --enable-static=yes --enable-shared=no --with-pic && echo $? \
+    && make -j 6 \
+    && make install \
+    && cd ../ && rm -rf expat-${EXPAT_VERSION} && rm -rf expat-${EXPAT_VERSION}.tar.gz
+
+# install Apr-util
+RUN mkdir -p dependencies/apr-util/${APRUTIL_VERSION} \
+    && wget https://archive.apache.org/dist/apr/apr-util-${APRUTIL_VERSION}.tar.gz --no-check-certificate \
+    && tar -xf apr-util-${APRUTIL_VERSION}.tar.gz \
+    && cd apr-util-${APRUTIL_VERSION} \
+    && ./configure --prefix=/dependencies/apr-util/${APRUTIL_VERSION} --enable-static=yes --enable-shared=no --with-pic --with-apr=/dependencies/apr/${APR_VERSION} --with-expat=/dependencies/expat/${EXPAT_VERSION} && echo $? \
+    && make -j 6 \
+    && make install \
+    && cd ../ && rm -rf apr-util-${APRUTIL_VERSION} && rm -rf apr-util-${APRUTIL_VERSION}.tar.gz
 
 # install m4
 RUN yum install m4 -y \
     && yum install perl-Data-Dumper -y
 
+# Update perl version
+RUN yum install perl-Thread-Queue.noarch -y \
+    && wget http://www.cpan.org/src/${PERL_CPANVERSION}/perl-${PERL_VERSION}.tar.gz \
+    && tar -xzf perl-${PERL_VERSION}.tar.gz \
+    && cd perl-${PERL_VERSION} \
+    && ./Configure -des -Dprefix=$HOME/localperl \
+    && make \
+    && make test; echo 0 \
+    && make install 
+ENV PATH=$HOME/localperl/bin:$PATH
 
+# install autoconf
+RUN wget --no-check-certificate https://ftp.gnu.org/gnu/autoconf/autoconf-${AUTOCONF_VERSION}.tar.gz \
+    && tar xzf autoconf-${AUTOCONF_VERSION}.tar.gz  \
+    && cd autoconf-${AUTOCONF_VERSION} \
+    && ./configure --prefix=/usr/ && make -j && make install && autoconf -V \
+    && cd .. && rm -rf autoconf-${AUTOCONF_VERSION}.tar.gz
 
 # install automake
 RUN wget --no-check-certificate https://ftp.gnu.org/gnu/automake/automake-${AUTOMAKE_VERSION}.tar.gz \
@@ -127,6 +183,26 @@ RUN wget --no-check-certificate https://ftp.gnu.org/gnu/automake/automake-${AUTO
     && automake --version \
     && cd .. && rm -rf automake-${AUTOMAKE_VERSION}.tar.gz
 
+# install libtool
+RUN wget --no-check-certificate https://ftpmirror.gnu.org/libtool/libtool-${LIBTOOL_VERSION}.tar.gz \
+    && tar xzf libtool-${LIBTOOL_VERSION}.tar.gz \
+    && cd libtool-${LIBTOOL_VERSION} \
+    && ./configure --prefix=/usr \
+    && make -j 6 \
+    && make install \
+    && libtool --version \
+    && cd .. && rm -rf libtool--${LIBTOOL_VERSION}.tar.gz
+
+#install log4cxx
+RUN mkdir -p dependencies/apache-log4cxx/${LOG4CXX_VERSION} \
+    && wget https://archive.apache.org/dist/logging/log4cxx/${LOG4CXX_VERSION}/apache-log4cxx-${LOG4CXX_VERSION}.tar.gz --no-check-certificate \
+    && tar -xf apache-log4cxx-${LOG4CXX_VERSION}.tar.gz \
+    && cd apache-log4cxx-${LOG4CXX_VERSION} \
+    && ./configure --prefix=/dependencies/apache-log4cxx/${LOG4CXX_VERSION}/ --enable-static=yes --enable-shared=no --with-pic --with-apr=/dependencies/apr/${APR_VERSION}/ --with-apr-util=/dependencies/apr-util/${APRUTIL_VERSION}/ && echo $? \
+    && make -j 6 ; echo 0 \
+    && automake --add-missing \
+    && make install \
+    && cd .. && rm -rf apache-log4cxx-${LOG4CXX_VERSION}.tar.gz && rm -rf apache-log4cxx-${LOG4CXX_VERSION}
 
 # install opentelemetry
 
@@ -155,6 +231,41 @@ RUN mkdir -p /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/lib \
     && cp -r sdk/include/ /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/ \
     && cd .. && rm -rf opentelemetry-cpp
 
+
+# install googletest
+RUN mkdir -p dependencies/googletest/${GTEST_VERSION}/ \
+    && wget https://github.com/google/googletest/archive/refs/tags/release-${GTEST_VERSION}.tar.gz --no-check-certificate \
+    && tar -xf release-${GTEST_VERSION}.tar.gz \
+    && cd googletest-release-${GTEST_VERSION}/  \
+    && mkdir build && cd build \
+    && cmake .. -DCMAKE_INSTALL_PREFIX=/dependencies/googletest/${GTEST_VERSION}/ \
+    && make \
+    && make install \
+    && cd ../.. && rm -rf release-${GTEST_VERSION}.tar.gz && rm -rf googletest-release-${GTEST_VERSION}/
+
+# install pcre
+RUN mkdir -p dependencies/pcre/${PCRE_VERSION}/ \
+    && wget https://ftp.exim.org/pub/pcre/pcre-${PCRE_VERSION}.tar.gz --no-check-certificate \
+    && tar -xvf pcre-${PCRE_VERSION}.tar.gz \
+    && cd pcre-${PCRE_VERSION} \
+    && ./configure --prefix=/dependencies/pcre/${PCRE_VERSION} --enable-jit \
+    && make && make install \
+    && cd .. && rm -rf ${PCRE_VERSION}.tar.gz && rm -rf pcre-${PCRE_VERSION}
+
+#Installing Apache and apr source code
+RUN mkdir build-dependencies \
+    && wget --no-check-certificate https://archive.apache.org/dist/apr/apr-${APR_VERSION}.tar.gz \
+    && tar -xf apr-${APR_VERSION}.tar.gz \
+    && mv -f apr-${APR_VERSION} build-dependencies \
+    && wget --no-check-certificate https://archive.apache.org/dist/apr/apr-util-${APRUTIL_VERSION}.tar.gz \
+    && tar -xf apr-util-${APRUTIL_VERSION}.tar.gz \
+    && mv -f apr-util-${APRUTIL_VERSION} build-dependencies \
+    && wget --no-check-certificate http://archive.apache.org/dist/httpd/httpd-2.2.31.tar.gz \
+    && tar -xf httpd-2.2.31.tar.gz \
+    && mv -f httpd-2.2.31 build-dependencies \
+    && wget --no-check-certificate http://archive.apache.org/dist/httpd/httpd-2.4.23.tar.gz \
+    && tar -xf httpd-2.4.23.tar.gz \
+    && mv -f httpd-2.4.23 build-dependencies
 
 # install nginx
 RUN wget http://nginx.org/download/nginx-${NGINX_VERSION}.tar.gz \
