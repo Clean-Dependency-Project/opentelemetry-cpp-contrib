@@ -88,6 +88,8 @@ RUN curl -o /usr/bin/gosu -SL "https://github.com/tianon/gosu/releases/download/
 RUN yum install git -y \
   && yum clean all
 
+RUN yum install -y automake-1.16.3
+
 # install cmake 3.20
 RUN wget https://cmake.org/files/v${CMAKE_VERSION}/cmake-${CMAKE_0VERSION}-linux-x86_64.tar.gz \
   && tar -xvf cmake-${CMAKE_0VERSION}-linux-x86_64.tar.gz \
@@ -175,13 +177,13 @@ RUN wget --no-check-certificate https://ftp.gnu.org/gnu/autoconf/autoconf-${AUTO
     && cd .. && rm -rf autoconf-${AUTOCONF_VERSION}.tar.gz
 
 # install automake
-RUN wget --no-check-certificate https://ftpmirror.gnu.org/gnu/automake/automake-${AUTOMAKE_VERSION}.tar.gz \
-    && tar xzf automake-${AUTOMAKE_VERSION}.tar.gz \
-    && cd automake-${AUTOMAKE_VERSION} \
-    && ./configure --prefix=/usr --libdir=/usr/lib64 \
-    && make -j$(nproc) && make install \
-    && automake --version \
-    && cd .. && rm -rf automake-${AUTOMAKE_VERSION}*
+# RUN wget --no-check-certificate https://ftpmirror.gnu.org/gnu/automake/automake-${AUTOMAKE_VERSION}.tar.gz \
+#     && tar xzf automake-${AUTOMAKE_VERSION}.tar.gz \
+#     && cd automake-${AUTOMAKE_VERSION} \
+#     && ./configure --prefix=/usr --libdir=/usr/lib64 \
+#     && make -j$(nproc) && make install \
+#     && automake --version \
+#     && cd .. && rm -rf automake-${AUTOMAKE_VERSION}*
 
 # install libtool
 RUN wget --no-check-certificate https://ftpmirror.gnu.org/libtool/libtool-${LIBTOOL_VERSION}.tar.gz \
