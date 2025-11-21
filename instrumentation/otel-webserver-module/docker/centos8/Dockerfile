@@ -68,7 +68,7 @@ ENV PATH="/opt/rh/gcc-toolset-9/root/usr/bin:${PATH}"
 #install automake
 RUN wget -4 --no-check-certificate \
         --tries=3 --timeout=30 \
-        https://ftp.gnu.org/gnu/automake/automake-${AUTOMAKE_VERSION}.tar.gz \
+        https://ftpmirror.gnu.org/gnu/automake/automake-${AUTOMAKE_VERSION}.tar.gz \
     && tar xzf automake-${AUTOMAKE_VERSION}.tar.gz \
     && cd automake-${AUTOMAKE_VERSION} \
     && ./configure --prefix=/usr --libdir=/usr/lib64 \
@@ -79,7 +79,7 @@ RUN wget -4 --no-check-certificate \
     && rm -rf automake-${AUTOMAKE_VERSION}*
 
 #install autoconf
-RUN wget --no-check-certificate https://ftp.gnu.org/gnu/autoconf/autoconf-${AUTOCONF_VERSION}.tar.gz \
+RUN wget -4 --no-check-certificate https://ftpmirror.gnu.org/gnu/autoconf/autoconf-${AUTOCONF_VERSION}.tar.gz \
     && tar xzf autoconf-${AUTOCONF_VERSION}.tar.gz  \
     && cd autoconf-${AUTOCONF_VERSION} \
     && ./configure --prefix=/usr/ && make -j && make install && autoconf -V \
