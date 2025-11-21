@@ -500,7 +500,8 @@ static void* ngx_http_opentelemetry_create_loc_conf(ngx_conf_t *cf)
 
     conf = ngx_pcalloc(cf->pool, sizeof(ngx_http_opentelemetry_loc_conf_t));
     if (conf == NULL) {
-        return NGX_CONF_ERROR;
+        ngx_writeTrace(cycle->log, \"ngx_http_opentelemetry_init\", \"EXIT: ngx_http_opentelemetry_init\");
+    \1
     }
 
     /* Initialize */
@@ -517,7 +518,8 @@ static void* ngx_http_opentelemetry_create_loc_conf(ngx_conf_t *cf)
     conf->nginxModuleOtelSslEnabled            = NGX_CONF_UNSET;
     conf->nginxModuleTrustIncomingSpans              = NGX_CONF_UNSET;
 
-    return conf;
+    ngx_writeTrace(cycle->log, \"ngx_http_opentelemetry_init\", \"EXIT: ngx_http_opentelemetry_init\");
+    \1
 }
 
 static char* ngx_http_opentelemetry_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child)
@@ -565,7 +567,8 @@ static char* ngx_http_opentelemetry_merge_loc_conf(ngx_conf_t *cf, void *parent,
     ngx_conf_merge_str_value(conf->nginxModulePropagatorType, prev->nginxModulePropagatorType, "w3c");
     ngx_conf_merge_str_value(conf->nginxModuleOperationName, prev->nginxModuleOperationName, "");
 
-    return NGX_CONF_OK;
+    ngx_writeTrace(cycle->log, \"ngx_http_opentelemetry_init\", \"EXIT: ngx_http_opentelemetry_init\");
+    \1
 }
 
 /*
@@ -603,7 +606,8 @@ static ngx_int_t ngx_http_opentelemetry_create_variables(ngx_conf_t *cf){
     for (ngx_http_variable_t* v = otel_ngx_variables; v->name.len; v++) {
         ngx_http_variable_t* var = ngx_http_add_variable(cf, &v->name, v->flags);
         if (var == NULL) {
-            return NGX_ERROR;
+            ngx_writeTrace(cycle->log, \"ngx_http_opentelemetry_init\", \"EXIT: ngx_http_opentelemetry_init\");
+    \1
         }
         var->get_handler = v->get_handler;
         var->set_handler = v->set_handler;
@@ -611,7 +615,8 @@ static ngx_int_t ngx_http_opentelemetry_create_variables(ngx_conf_t *cf){
         v->index = var->index = ngx_http_get_variable_index(cf, &v->name);
     }
 
-    return NGX_OK;
+    ngx_writeTrace(cycle->log, \"ngx_http_opentelemetry_init\", \"EXIT: ngx_http_opentelemetry_init\");
+    \1
 }
 
 ngx_int_t ngx_opentelemetry_initialise_trace_id(ngx_http_request_t *r, ngx_http_variable_value_t *v, uintptr_t data) {
@@ -629,7 +634,8 @@ ngx_int_t ngx_opentelemetry_initialise_trace_id(ngx_http_request_t *r, ngx_http_
     v->no_cacheable = 0;
     v->not_found = 0;
 
-    return NGX_OK;
+    ngx_writeTrace(cycle->log, \"ngx_http_opentelemetry_init\", \"EXIT: ngx_http_opentelemetry_init\");
+    \1
 }
 
 ngx_int_t ngx_opentelemetry_initialise_span_id(ngx_http_request_t *r, ngx_http_variable_value_t *v, uintptr_t data) {
@@ -647,7 +653,8 @@ ngx_int_t ngx_opentelemetry_initialise_span_id(ngx_http_request_t *r, ngx_http_v
     v->no_cacheable = 0;
     v->not_found = 0;
 
-    return NGX_OK;
+    ngx_writeTrace(cycle->log, \"ngx_http_opentelemetry_init\", \"EXIT: ngx_http_opentelemetry_init\");
+    \1
 }
 
 ngx_int_t ngx_opentelemetry_initialise_context_traceparent(ngx_http_request_t *r, ngx_http_variable_value_t *v, uintptr_t data) {
@@ -666,7 +673,8 @@ ngx_int_t ngx_opentelemetry_initialise_context_traceparent(ngx_http_request_t *r
     v->no_cacheable = 0;
     v->not_found = 0;
     
-    return NGX_OK;
+    ngx_writeTrace(cycle->log, \"ngx_http_opentelemetry_init\", \"EXIT: ngx_http_opentelemetry_init\");
+    \1
 }
 
 ngx_int_t ngx_opentelemetry_initialise_context_b3(ngx_http_request_t *r, ngx_http_variable_value_t *v, uintptr_t data) {
@@ -685,11 +693,12 @@ ngx_int_t ngx_opentelemetry_initialise_context_b3(ngx_http_request_t *r, ngx_htt
     v->no_cacheable = 0;
     v->not_found = 0;
 
-    return NGX_OK;
+    ngx_writeTrace(cycle->log, \"ngx_http_opentelemetry_init\", \"EXIT: ngx_http_opentelemetry_init\");
+    \1
 }
 
-static ngx_int_t ngx_http_opentelemetry_init(ngx_conf_t *cf)
-{
+\1
+    ngx_writeTrace(cycle->log, \"ngx_http_opentelemetry_init\", \"ENTER: ngx_http_opentelemetry_init\");
     ngx_http_core_main_conf_t    *cmcf;
     ngx_uint_t                   m, cp, ap, pap, srp, prp, rp, lp, pcp;
     ngx_http_phases              ph;
@@ -802,14 +811,15 @@ static ngx_int_t ngx_http_opentelemetry_init(ngx_conf_t *cf)
     */
     ngx_writeTrace(cf->cycle->log, __func__, "Opentelemetry Module init completed!");
 
-  return NGX_OK;
+  ngx_writeTrace(cycle->log, \"ngx_http_opentelemetry_init\", \"EXIT: ngx_http_opentelemetry_init\");
+    \1
 }
 
 /*
     This function gets called when master process creates worker processes
 */
-static ngx_int_t ngx_http_opentelemetry_init_worker(ngx_cycle_t *cycle)
-{
+\1
+    ngx_writeTrace(cycle->log, \"ngx_http_opentelemetry_init_worker\", \"ENTER: ngx_http_opentelemetry_init_worker\");
     int p = getpid();
     char * s = (char *)ngx_pcalloc(cycle->pool, 6);
     sprintf(s, "%d", p);
@@ -819,12 +829,14 @@ static ngx_int_t ngx_http_opentelemetry_init_worker(ngx_cycle_t *cycle)
     worker_conf = ngx_pcalloc(cycle->pool, sizeof(ngx_http_opentelemetry_worker_conf_t));
     if (worker_conf == NULL) {
        ngx_log_error(NGX_LOG_ERR, cycle->log, 0, "mod_opentelemetry: ngx_http_opentelemetry_init_worker: Not able to allocate memeory for worker conf");
-       return NGX_ERROR;
+       ngx_writeTrace(cycle->log, \"ngx_http_opentelemetry_init\", \"EXIT: ngx_http_opentelemetry_init\");
+    \1
     }
 
     worker_conf->pid = s;
 
-    return NGX_OK;
+    ngx_writeTrace(cycle->log, \"ngx_http_opentelemetry_init\", \"EXIT: ngx_http_opentelemetry_init\");
+    \1
 }
 
 /*
@@ -850,20 +862,23 @@ static char* ngx_otel_attributes_set(ngx_conf_t* cf, ngx_command_t* cmd, void* c
     arr = ngx_array_create(cf->pool, arg_count, sizeof(ngx_str_t));
 
     if (arr == NULL) {
-        return NGX_CONF_ERROR;
+        ngx_writeTrace(cycle->log, \"ngx_http_opentelemetry_init\", \"EXIT: ngx_http_opentelemetry_init\");
+    \1
     }
 
     // Add elements to the array
     for (ngx_int_t i = 1; i < arg_count; i++) {
         elt = ngx_array_push(arr);
         if (elt == NULL) {
-            return NGX_CONF_ERROR;
+            ngx_writeTrace(cycle->log, \"ngx_http_opentelemetry_init\", \"EXIT: ngx_http_opentelemetry_init\");
+    \1
         }
         ngx_str_set(elt, value[i].data);
         elt->len = ngx_strlen(value[i].data);
     }
     my_conf->nginxModuleAttributes = arr;
-    return NGX_CONF_OK;
+    ngx_writeTrace(cycle->log, \"ngx_http_opentelemetry_init\", \"EXIT: ngx_http_opentelemetry_init\");
+    \1
 
 }
 
@@ -882,7 +897,8 @@ static char* ngx_conf_set_propagator(ngx_conf_t* cf, ngx_command_t* cmd, void* c
         elt.len = sizeof("w3c") - 1;
         my_conf->nginxModulePropagatorType = elt;
     }
-    return NGX_CONF_OK;
+    ngx_writeTrace(cycle->log, \"ngx_http_opentelemetry_init\", \"EXIT: ngx_http_opentelemetry_init\");
+    \1
 
 }
 static char* ngx_conf_ignore_path_set(ngx_conf_t* cf, ngx_command_t* cmd, void* conf) {
@@ -895,19 +911,22 @@ static char* ngx_conf_ignore_path_set(ngx_conf_t* cf, ngx_command_t* cmd, void* 
 
     arr = ngx_array_create(cf->pool, arg_count, sizeof(ngx_str_t));
     if (arr == NULL) {
-        return NGX_CONF_ERROR;
+        ngx_writeTrace(cycle->log, \"ngx_http_opentelemetry_init\", \"EXIT: ngx_http_opentelemetry_init\");
+    \1
     }
 
     for (ngx_int_t i = 1; i < arg_count; i++) {
         elt = ngx_array_push(arr);
         if (elt == NULL) {
-            return NGX_CONF_ERROR;
+            ngx_writeTrace(cycle->log, \"ngx_http_opentelemetry_init\", \"EXIT: ngx_http_opentelemetry_init\");
+    \1
         }
         ngx_str_set(elt, value[i].data);
         elt->len = ngx_strlen(value[i].data);
     }
     my_conf->nginxModuleIgnorePaths = arr;
-    return NGX_CONF_OK;
+    ngx_writeTrace(cycle->log, \"ngx_http_opentelemetry_init\", \"EXIT: ngx_http_opentelemetry_init\");
+    \1
 
 }
 
@@ -926,7 +945,8 @@ static char* ngx_otel_context_set(ngx_conf_t *cf, ngx_command_t *cmd, void *conf
         c_count++;
     }
 
-    return NGX_CONF_OK;
+    ngx_writeTrace(cycle->log, \"ngx_http_opentelemetry_init\", \"EXIT: ngx_http_opentelemetry_init\");
+    \1
 }
 static void ngx_otel_set_global_context(ngx_http_opentelemetry_loc_conf_t * prev)
 {
@@ -972,14 +992,16 @@ static void ngx_conf_merge_ignore_paths(ngx_http_opentelemetry_loc_conf_t * prev
 /*
     Begin a new interaction
 */
-static OTEL_SDK_STATUS_CODE otel_startInteraction(ngx_http_request_t* r, const char* module_name){
+\1
+    ngx_writeTrace(cycle->log, \"otel_startInteraction\", \"ENTER: otel_startInteraction\");
     OTEL_SDK_STATUS_CODE res = OTEL_SUCCESS;
     ngx_http_otel_handles_t* ctx;
 
     if(!r || r->internal)
     {
         ngx_writeTrace(r->connection->log, __func__, "It is not a main Request, not starting interaction");
-        return res;
+        ngx_writeTrace(cycle->log, \"ngx_http_opentelemetry_init\", \"EXIT: ngx_http_opentelemetry_init\");
+    \1
     }
 
     ctx = ngx_http_get_module_ctx(r, ngx_http_opentelemetry_module);
@@ -996,7 +1018,8 @@ static OTEL_SDK_STATUS_CODE otel_startInteraction(ngx_http_request_t* r, const c
         if (propagationHeaders == NULL)
         {
             ngx_writeError(r->connection->log, __func__, "Failed to allocate memory for propagation headers");
-            return OTEL_STATUS(fail);
+            ngx_writeTrace(cycle->log, \"ngx_http_opentelemetry_init\", \"EXIT: ngx_http_opentelemetry_init\");
+    \1
         }
         ngx_writeTrace(r->connection->log, __func__, "Starting a new module interaction for: %s", module_name);
         int ix = 0;
@@ -1022,7 +1045,8 @@ static OTEL_SDK_STATUS_CODE otel_startInteraction(ngx_http_request_t* r, const c
             free(propagationHeaders[i].value);
         }
     }
-    return res;
+    ngx_writeTrace(cycle->log, \"ngx_http_opentelemetry_init\", \"EXIT: ngx_http_opentelemetry_init\");
+    \1
 }
 
 /*
@@ -1271,15 +1295,19 @@ static void otel_stopInteraction(ngx_http_request_t* r, const char* module_name,
 
 static ngx_flag_t otel_requestHasErrors(ngx_http_request_t* r)
 {
-    return (r->err_status >= LOWEST_HTTP_ERROR_CODE)||(r->headers_out.status >= LOWEST_HTTP_ERROR_CODE);
+    ngx_writeTrace(cycle->log, \"ngx_http_opentelemetry_init\", \"EXIT: ngx_http_opentelemetry_init\");
+    \1
 }
 static ngx_uint_t otel_getErrorCode(ngx_http_request_t* r)
 {
     if(r->err_status >= LOWEST_HTTP_ERROR_CODE)
-      return r->err_status;
+      ngx_writeTrace(cycle->log, \"ngx_http_opentelemetry_init\", \"EXIT: ngx_http_opentelemetry_init\");
+    \1
     else if(r->headers_out.status >= LOWEST_HTTP_ERROR_CODE)
-      return r->headers_out.status;
-    else return 0;
+      ngx_writeTrace(cycle->log, \"ngx_http_opentelemetry_init\", \"EXIT: ngx_http_opentelemetry_init\");
+    \1
+    else ngx_writeTrace(cycle->log, \"ngx_http_opentelemetry_init\", \"EXIT: ngx_http_opentelemetry_init\");
+    \1
 }
 
 static void resolve_attributes_variables(ngx_http_request_t* r)
@@ -1329,20 +1357,23 @@ static ngx_flag_t check_ignore_paths(ngx_http_request_t *r)
             const char* data = (const char*)(((ngx_str_t *)(conf->nginxModuleIgnorePaths->elts))[j]).data;
             bool ans = matchIgnorePathRegex(pathToCheck , data);
             if(ans){
-                return true;
+                ngx_writeTrace(cycle->log, \"ngx_http_opentelemetry_init\", \"EXIT: ngx_http_opentelemetry_init\");
+    \1
             }
         }
     }
-    return false;
+    ngx_writeTrace(cycle->log, \"ngx_http_opentelemetry_init\", \"EXIT: ngx_http_opentelemetry_init\");
+    \1
 }
 
-static ngx_flag_t ngx_initialize_opentelemetry(ngx_http_request_t *r)
-{
+\1
+    ngx_writeTrace(cycle->log, \"ngx_initialize_opentelemetry\", \"ENTER: ngx_initialize_opentelemetry\");
     // check to see if we have already been initialized
     if (worker_conf && worker_conf->isInitialized)
     {
         ngx_writeTrace(r->connection->log, __func__, "Opentelemetry SDK already initialized for process with PID: %s", worker_conf->pid);
-        return true;
+        ngx_writeTrace(cycle->log, \"ngx_http_opentelemetry_init\", \"EXIT: ngx_http_opentelemetry_init\");
+    \1
     }
 
     ngx_http_opentelemetry_loc_conf_t	*conf;
@@ -1350,7 +1381,8 @@ static ngx_flag_t ngx_initialize_opentelemetry(ngx_http_request_t *r)
     if (conf == NULL)
     {
         ngx_writeError(r->connection->log, __func__, "Module location configuration is NULL");
-        return false;
+        ngx_writeTrace(cycle->log, \"ngx_http_opentelemetry_init\", \"EXIT: ngx_http_opentelemetry_init\");
+    \1
     }
 
     traceConfig(r, conf);
@@ -1379,7 +1411,8 @@ static ngx_flag_t ngx_initialize_opentelemetry(ngx_http_request_t *r)
         if(env_config == NULL)
         {
             ngx_writeError(r->connection->log, __func__, "Not Able to allocate memory for the Env Config");
-            return false;
+            ngx_writeTrace(cycle->log, \"ngx_http_opentelemetry_init\", \"EXIT: ngx_http_opentelemetry_init\");
+    \1
         }
         int ix = 0;
 
@@ -1515,21 +1548,25 @@ static ngx_flag_t ngx_initialize_opentelemetry(ngx_http_request_t *r)
         {
             worker_conf->isInitialized = 1;
             ngx_writeTrace(r->connection->log, __func__, "Initializing Agent Core succceeded for process with PID: %s", worker_conf->pid);
-            return true;
+            ngx_writeTrace(cycle->log, \"ngx_http_opentelemetry_init\", \"EXIT: ngx_http_opentelemetry_init\");
+    \1
         }
         else
         {
            ngx_writeError(r->connection->log, __func__, "Agent Core Init failed, result code is %d", res);
-           return false;
+           ngx_writeTrace(cycle->log, \"ngx_http_opentelemetry_init\", \"EXIT: ngx_http_opentelemetry_init\");
+    \1
         }
     }
     else
     {
         // Agent core is not enabled
         ngx_writeError(r->connection->log, __func__, "Agent Core is not enabled");
-        return false;
+        ngx_writeTrace(cycle->log, \"ngx_http_opentelemetry_init\", \"EXIT: ngx_http_opentelemetry_init\");
+    \1
     }
-    return false;
+    ngx_writeTrace(cycle->log, \"ngx_http_opentelemetry_init\", \"EXIT: ngx_http_opentelemetry_init\");
+    \1
 }
 
 static void stopMonitoringRequest(ngx_http_request_t* r,
@@ -1602,7 +1639,8 @@ static void stopMonitoringRequest(ngx_http_request_t* r,
     return;
 }
 
-static void startMonitoringRequest(ngx_http_request_t* r){
+\1
+    ngx_writeTrace(cycle->log, \"startMonitoringRequest\", \"ENTER: startMonitoringRequest\");
     // If a not a the main request(sub-request or internal redirect), calls Realip handler and return
     if(r->internal)
     {
@@ -1706,7 +1744,8 @@ static ngx_int_t ngx_http_otel_rewrite_handler(ngx_http_request_t *r){
     ngx_int_t rvalue = h[NGX_HTTP_REWRITE_MODULE_INDEX](r);
     otel_stopInteraction(r, "ngx_http_rewrite_module", OTEL_SDK_NO_HANDLE);
 
-    return rvalue;
+    ngx_writeTrace(cycle->log, \"ngx_http_opentelemetry_init\", \"EXIT: ngx_http_opentelemetry_init\");
+    \1
 }
 
 static ngx_int_t ngx_http_otel_limit_conn_handler(ngx_http_request_t *r){
@@ -1714,7 +1753,8 @@ static ngx_int_t ngx_http_otel_limit_conn_handler(ngx_http_request_t *r){
     ngx_int_t rvalue = h[NGX_HTTP_LIMIT_CONN_MODULE_INDEX](r);
     otel_stopInteraction(r, "ngx_http_limit_conn_module", OTEL_SDK_NO_HANDLE);
 
-    return rvalue;
+    ngx_writeTrace(cycle->log, \"ngx_http_opentelemetry_init\", \"EXIT: ngx_http_opentelemetry_init\");
+    \1
 }
 
 static ngx_int_t ngx_http_otel_limit_req_handler(ngx_http_request_t *r){
@@ -1722,7 +1762,8 @@ static ngx_int_t ngx_http_otel_limit_req_handler(ngx_http_request_t *r){
     ngx_int_t rvalue = h[NGX_HTTP_LIMIT_REQ_MODULE_INDEX](r);
     otel_stopInteraction(r, "ngx_http_limit_req_module", OTEL_SDK_NO_HANDLE);
 
-    return rvalue;
+    ngx_writeTrace(cycle->log, \"ngx_http_opentelemetry_init\", \"EXIT: ngx_http_opentelemetry_init\");
+    \1
 }
 
 static ngx_int_t ngx_http_otel_realip_handler(ngx_http_request_t *r){
@@ -1730,7 +1771,8 @@ static ngx_int_t ngx_http_otel_realip_handler(ngx_http_request_t *r){
     ngx_int_t rvalue = h[NGX_HTTP_REALIP_MODULE_INDEX](r);
     otel_stopInteraction(r, "ngx_http_realip_module", OTEL_SDK_NO_HANDLE);    
 
-    return rvalue;
+    ngx_writeTrace(cycle->log, \"ngx_http_opentelemetry_init\", \"EXIT: ngx_http_opentelemetry_init\");
+    \1
 }
 
 static ngx_int_t ngx_http_otel_auth_request_handler(ngx_http_request_t *r){
@@ -1738,7 +1780,8 @@ static ngx_int_t ngx_http_otel_auth_request_handler(ngx_http_request_t *r){
     ngx_int_t rvalue = h[NGX_HTTP_LIMIT_AUTH_REQ_MODULE_INDEX](r);
     otel_stopInteraction(r, "ngx_http_auth_request_module", OTEL_SDK_NO_HANDLE);
 
-    return rvalue;
+    ngx_writeTrace(cycle->log, \"ngx_http_opentelemetry_init\", \"EXIT: ngx_http_opentelemetry_init\");
+    \1
 }
 
 static ngx_int_t ngx_http_otel_auth_basic_handler(ngx_http_request_t *r){
@@ -1746,7 +1789,8 @@ static ngx_int_t ngx_http_otel_auth_basic_handler(ngx_http_request_t *r){
     ngx_int_t rvalue = h[NGX_HTTP_AUTH_BASIC_MODULE_INDEX](r);
     otel_stopInteraction(r, "ngx_http_auth_basic_module", OTEL_SDK_NO_HANDLE);
 
-    return rvalue;
+    ngx_writeTrace(cycle->log, \"ngx_http_opentelemetry_init\", \"EXIT: ngx_http_opentelemetry_init\");
+    \1
 }
 
 static ngx_int_t ngx_http_otel_access_handler(ngx_http_request_t *r){
@@ -1754,7 +1798,8 @@ static ngx_int_t ngx_http_otel_access_handler(ngx_http_request_t *r){
     ngx_int_t rvalue = h[NGX_HTTP_ACCESS_MODULE_INDEX](r);
     otel_stopInteraction(r, "ngx_http_access_module", OTEL_SDK_NO_HANDLE);
 
-    return rvalue;
+    ngx_writeTrace(cycle->log, \"ngx_http_opentelemetry_init\", \"EXIT: ngx_http_opentelemetry_init\");
+    \1
 }
 
 static ngx_int_t ngx_http_otel_static_handler(ngx_http_request_t *r){
@@ -1762,7 +1807,8 @@ static ngx_int_t ngx_http_otel_static_handler(ngx_http_request_t *r){
     ngx_int_t rvalue = h[NGX_HTTP_STATIC_MODULE_INDEX](r);
     otel_stopInteraction(r, "ngx_http_static_module", OTEL_SDK_NO_HANDLE);
 
-    return rvalue;
+    ngx_writeTrace(cycle->log, \"ngx_http_opentelemetry_init\", \"EXIT: ngx_http_opentelemetry_init\");
+    \1
 }
 
 static ngx_int_t ngx_http_otel_gzip_static_handler(ngx_http_request_t *r){
@@ -1770,7 +1816,8 @@ static ngx_int_t ngx_http_otel_gzip_static_handler(ngx_http_request_t *r){
     ngx_int_t rvalue = h[NGX_HTTP_GZIP_STATIC_MODULE_INDEX](r);
     otel_stopInteraction(r, "ngx_http_gzip_static_module", OTEL_SDK_NO_HANDLE);
 
-    return rvalue;
+    ngx_writeTrace(cycle->log, \"ngx_http_opentelemetry_init\", \"EXIT: ngx_http_opentelemetry_init\");
+    \1
 }
 
 static ngx_int_t ngx_http_otel_dav_handler(ngx_http_request_t *r){
@@ -1778,7 +1825,8 @@ static ngx_int_t ngx_http_otel_dav_handler(ngx_http_request_t *r){
     ngx_int_t rvalue = h[NGX_HTTP_DAV_MODULE_INDEX](r);
     otel_stopInteraction(r, "ngx_http_dav_module", OTEL_SDK_NO_HANDLE);
 
-    return rvalue;
+    ngx_writeTrace(cycle->log, \"ngx_http_opentelemetry_init\", \"EXIT: ngx_http_opentelemetry_init\");
+    \1
 }
 
 static ngx_int_t ngx_http_otel_autoindex_handler(ngx_http_request_t *r){
@@ -1786,7 +1834,8 @@ static ngx_int_t ngx_http_otel_autoindex_handler(ngx_http_request_t *r){
     ngx_int_t rvalue = h[NGX_HTTP_AUTO_INDEX_MODULE_INDEX](r);
     otel_stopInteraction(r, "ngx_http_autoindex_module", OTEL_SDK_NO_HANDLE);
 
-    return rvalue;
+    ngx_writeTrace(cycle->log, \"ngx_http_opentelemetry_init\", \"EXIT: ngx_http_opentelemetry_init\");
+    \1
 }
 
 /*  autoindex, index and randomindex handlers get called during
@@ -1819,7 +1868,8 @@ static ngx_int_t ngx_http_otel_index_handler(ngx_http_request_t *r){
         otel_stopInteraction(r, "ngx_http_index_module", OTEL_SDK_NO_HANDLE);
     }
 
-    return rvalue;
+    ngx_writeTrace(cycle->log, \"ngx_http_opentelemetry_init\", \"EXIT: ngx_http_opentelemetry_init\");
+    \1
 }
 
 static ngx_int_t ngx_http_otel_random_index_handler(ngx_http_request_t *r){
@@ -1840,7 +1890,8 @@ static ngx_int_t ngx_http_otel_random_index_handler(ngx_http_request_t *r){
         otel_stopInteraction(r, "ngx_http_random_index_module", OTEL_SDK_NO_HANDLE);
     }
 
-    return rvalue;
+    ngx_writeTrace(cycle->log, \"ngx_http_opentelemetry_init\", \"EXIT: ngx_http_opentelemetry_init\");
+    \1
 }
 
 /*  tryfiles handler gets called with try_files tag. In this case
@@ -1877,7 +1928,8 @@ static ngx_int_t ngx_http_otel_try_files_handler(ngx_http_request_t *r) {
     if (!r->pool) {
         stopMonitoringRequest(r, request_handle);
     }
-    return rvalue;
+    ngx_writeTrace(cycle->log, \"ngx_http_opentelemetry_init\", \"EXIT: ngx_http_opentelemetry_init\");
+    \1
 }
 
 static ngx_int_t ngx_http_otel_mirror_handler(ngx_http_request_t *r) {
@@ -1885,7 +1937,8 @@ static ngx_int_t ngx_http_otel_mirror_handler(ngx_http_request_t *r) {
     ngx_int_t rvalue = h[NGX_HTTP_MIRROR_MODULE_INDEX](r);
     otel_stopInteraction(r, "ngx_http_otel_mirror_handler", OTEL_SDK_NO_HANDLE);
 
-    return rvalue;
+    ngx_writeTrace(cycle->log, \"ngx_http_opentelemetry_init\", \"EXIT: ngx_http_opentelemetry_init\");
+    \1
 }
 
 static ngx_int_t ngx_http_otel_log_handler(ngx_http_request_t *r){
@@ -1896,16 +1949,19 @@ static ngx_int_t ngx_http_otel_log_handler(ngx_http_request_t *r){
 
     ngx_int_t rvalue = h[NGX_HTTP_LOG_MODULE_INDEX](r);
 
-    return rvalue;
+    ngx_writeTrace(cycle->log, \"ngx_http_opentelemetry_init\", \"EXIT: ngx_http_opentelemetry_init\");
+    \1
 }
 
 static ngx_int_t isOTelMonitored(const char* str){
     unsigned int i = 0;
     for(i=0; i<NGX_HTTP_MAX_HANDLE_COUNT; i++){
         if(strcmp(str, otel_monitored_modules[i].name) == 0)
-            return i;
+            ngx_writeTrace(cycle->log, \"ngx_http_opentelemetry_init\", \"EXIT: ngx_http_opentelemetry_init\");
+    \1
         }
-    return -1;
+    ngx_writeTrace(cycle->log, \"ngx_http_opentelemetry_init\", \"EXIT: ngx_http_opentelemetry_init\");
+    \1
 }
 
 static char* computeContextName(ngx_http_request_t *r, ngx_http_opentelemetry_loc_conf_t* conf){
@@ -1916,7 +1972,8 @@ static char* computeContextName(ngx_http_request_t *r, ngx_http_opentelemetry_lo
         strcat(name, (const char*)(conf->nginxModuleServiceName).data);
         strcat(name, (const char*)(conf->nginxModuleServiceInstanceId).data);
     }
-    return name;
+    ngx_writeTrace(cycle->log, \"ngx_http_opentelemetry_init\", \"EXIT: ngx_http_opentelemetry_init\");
+    \1
 }
 
 static void traceConfig(ngx_http_request_t *r, ngx_http_opentelemetry_loc_conf_t* conf){
