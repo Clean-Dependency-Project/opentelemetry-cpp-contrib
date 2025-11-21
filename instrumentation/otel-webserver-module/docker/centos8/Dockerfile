@@ -63,6 +63,15 @@ RUN dnf install -y gcc-toolset-9 && \
 
 ENV PATH="/opt/rh/gcc-toolset-9/root/usr/bin:${PATH}"
 
+install automake
+RUN wget --no-check-certificate https://ftpmirror.gnu.org/gnu/automake/automake-${AUTOMAKE_VERSION}.tar.gz \
+    && tar xzf automake-${AUTOMAKE_VERSION}.tar.gz \
+    && cd automake-${AUTOMAKE_VERSION} \
+    && ./configure --prefix=/usr --libdir=/usr/lib64 \
+    && make -j$(nproc) && make install \
+    && automake --version \
+    && cd .. && rm -rf automake-${AUTOMAKE_VERSION}*
+
 # install python 2.7.8
 RUN wget http://www.python.org/ftp/python/${PYTHON_VERSION}/Python-${PYTHON_VERSION}.tar.xz \
     && unxz Python-${PYTHON_VERSION}.tar.xz \
@@ -88,7 +97,7 @@ RUN curl -o /usr/bin/gosu -SL "https://github.com/tianon/gosu/releases/download/
 RUN yum install git -y \
   && yum clean all
 
-RUN yum install -y automake-1.16.3
+
 
 # install cmake 3.20
 RUN wget https://cmake.org/files/v${CMAKE_VERSION}/cmake-${CMAKE_0VERSION}-linux-x86_64.tar.gz \
