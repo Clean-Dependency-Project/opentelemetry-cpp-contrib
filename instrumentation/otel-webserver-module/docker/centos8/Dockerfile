@@ -63,7 +63,7 @@ RUN dnf install -y gcc-toolset-9 && \
 
 ENV PATH="/opt/rh/gcc-toolset-9/root/usr/bin:${PATH}"
 
-install automake
+#install automake
 RUN wget --no-check-certificate https://ftpmirror.gnu.org/gnu/automake/automake-${AUTOMAKE_VERSION}.tar.gz \
     && tar xzf automake-${AUTOMAKE_VERSION}.tar.gz \
     && cd automake-${AUTOMAKE_VERSION} \
