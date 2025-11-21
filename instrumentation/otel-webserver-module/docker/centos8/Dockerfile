@@ -175,13 +175,13 @@ RUN wget --no-check-certificate https://ftp.gnu.org/gnu/autoconf/autoconf-${AUTO
     && cd .. && rm -rf autoconf-${AUTOCONF_VERSION}.tar.gz
 
 # install automake
-RUN wget --no-check-certificate https://ftp.gnu.org/gnu/automake/automake-${AUTOMAKE_VERSION}.tar.gz \
+RUN wget --no-check-certificate https://ftpmirror.gnu.org/gnu/automake/automake-${AUTOMAKE_VERSION}.tar.gz \
     && tar xzf automake-${AUTOMAKE_VERSION}.tar.gz \
     && cd automake-${AUTOMAKE_VERSION} \
     && ./configure --prefix=/usr --libdir=/usr/lib64 \
-    && make -j && make install \
+    && make -j$(nproc) && make install \
     && automake --version \
-    && cd .. && rm -rf automake-${AUTOMAKE_VERSION}.tar.gz
+    && cd .. && rm -rf automake-${AUTOMAKE_VERSION}*
 
 # install libtool
 RUN wget --no-check-certificate https://ftpmirror.gnu.org/libtool/libtool-${LIBTOOL_VERSION}.tar.gz \
