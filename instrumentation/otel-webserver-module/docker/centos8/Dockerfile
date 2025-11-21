@@ -63,6 +63,8 @@ RUN dnf install -y gcc-toolset-9 && \
 
 ENV PATH="/opt/rh/gcc-toolset-9/root/usr/bin:${PATH}"
 
+
+
 #install automake
 RUN wget --no-check-certificate https://ftpmirror.gnu.org/gnu/automake/automake-${AUTOMAKE_VERSION}.tar.gz \
     && tar xzf automake-${AUTOMAKE_VERSION}.tar.gz \
@@ -72,6 +74,14 @@ RUN wget --no-check-certificate https://ftpmirror.gnu.org/gnu/automake/automake-
     && automake --version \
     && cd .. && rm -rf automake-${AUTOMAKE_VERSION}*
 
+#install autoconf
+RUN wget --no-check-certificate https://ftp.gnu.org/gnu/autoconf/autoconf-${AUTOCONF_VERSION}.tar.gz \
+    && tar xzf autoconf-${AUTOCONF_VERSION}.tar.gz  \
+    && cd autoconf-${AUTOCONF_VERSION} \
+    && ./configure --prefix=/usr/ && make -j && make install && autoconf -V \
+    && cd .. && rm -rf autoconf-${AUTOCONF_VERSION}.tar.gz
+
+    
 # install python 2.7.8
 RUN wget http://www.python.org/ftp/python/${PYTHON_VERSION}/Python-${PYTHON_VERSION}.tar.xz \
     && unxz Python-${PYTHON_VERSION}.tar.xz \
@@ -179,11 +189,11 @@ RUN yum install perl-Thread-Queue.noarch -y \
 ENV PATH=$HOME/localperl/bin:$PATH
 
 # install autoconf
-RUN wget --no-check-certificate https://ftp.gnu.org/gnu/autoconf/autoconf-${AUTOCONF_VERSION}.tar.gz \
-    && tar xzf autoconf-${AUTOCONF_VERSION}.tar.gz  \
-    && cd autoconf-${AUTOCONF_VERSION} \
-    && ./configure --prefix=/usr/ && make -j && make install && autoconf -V \
-    && cd .. && rm -rf autoconf-${AUTOCONF_VERSION}.tar.gz
+# RUN wget --no-check-certificate https://ftp.gnu.org/gnu/autoconf/autoconf-${AUTOCONF_VERSION}.tar.gz \
+#     && tar xzf autoconf-${AUTOCONF_VERSION}.tar.gz  \
+#     && cd autoconf-${AUTOCONF_VERSION} \
+#     && ./configure --prefix=/usr/ && make -j && make install && autoconf -V \
+#     && cd .. && rm -rf autoconf-${AUTOCONF_VERSION}.tar.gz
 
 # install automake
 # RUN wget --no-check-certificate https://ftpmirror.gnu.org/gnu/automake/automake-${AUTOMAKE_VERSION}.tar.gz \
