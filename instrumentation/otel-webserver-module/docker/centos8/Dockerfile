@@ -60,10 +60,10 @@ RUN yum install -y epel-release && \
 
 
 # install devtoolset toolchain
-RUN dnf install -y gcc-toolset-9 && \
+RUN dnf install -y gcc-toolset-14 && \
     dnf clean all
 
-ENV PATH="/opt/rh/gcc-toolset-9/root/usr/bin:${PATH}"
+ENV PATH="/opt/rh/gcc-toolset-14/root/usr/bin:${PATH}"
 
 # install python 2.7.8
 RUN wget http://www.python.org/ftp/python/${PYTHON_VERSION}/Python-${PYTHON_VERSION}.tar.xz \
