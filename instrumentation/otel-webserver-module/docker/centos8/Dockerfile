@@ -63,22 +63,6 @@ RUN dnf install -y gcc-toolset-9 && \
 
 ENV PATH="/opt/rh/gcc-toolset-9/root/usr/bin:${PATH}"
 
-#install autoconf
-RUN wget -4 --no-check-certificate https://ftpmirror.gnu.org/gnu/autoconf/autoconf-${AUTOCONF_VERSION}.tar.gz \
-    && tar xzf autoconf-${AUTOCONF_VERSION}.tar.gz  \
-    && cd autoconf-${AUTOCONF_VERSION} \
-    && ./configure --prefix=/usr/ && make -j && make install && autoconf -V \
-    && cd .. && rm -rf autoconf-${AUTOCONF_VERSION}.tar.gz
-
-#install automake
-RUN wget -4 http://ftpmirror.gnu.org/gnu/automake/automake-${AUTOMAKE_VERSION}.tar.gz \
-    && tar xzf automake-${AUTOMAKE_VERSION}.tar.gz \
-    && cd automake-${AUTOMAKE_VERSION} \
-    && ./configure --prefix=/usr --libdir=/usr/lib64 \
-    && make -j"$(nproc)" && make install \
-    && automake --version \
-    && cd .. && rm -rf automake-${AUTOMAKE_VERSION}*
-
 # install python 2.7.8
 RUN wget http://www.python.org/ftp/python/${PYTHON_VERSION}/Python-${PYTHON_VERSION}.tar.xz \
     && unxz Python-${PYTHON_VERSION}.tar.xz \
@@ -103,8 +87,6 @@ RUN curl -o /usr/bin/gosu -SL "https://github.com/tianon/gosu/releases/download/
 # install git required for grpc
 RUN yum install git -y \
   && yum clean all
-
-
 
 # install cmake 3.20
 RUN wget https://cmake.org/files/v${CMAKE_VERSION}/cmake-${CMAKE_0VERSION}-linux-x86_64.tar.gz \
@@ -186,20 +168,20 @@ RUN yum install perl-Thread-Queue.noarch -y \
 ENV PATH=$HOME/localperl/bin:$PATH
 
 # install autoconf
-# RUN wget --no-check-certificate https://ftp.gnu.org/gnu/autoconf/autoconf-${AUTOCONF_VERSION}.tar.gz \
-#     && tar xzf autoconf-${AUTOCONF_VERSION}.tar.gz  \
-#     && cd autoconf-${AUTOCONF_VERSION} \
-#     && ./configure --prefix=/usr/ && make -j && make install && autoconf -V \
-#     && cd .. && rm -rf autoconf-${AUTOCONF_VERSION}.tar.gz
+RUN wget --no-check-certificate https://ftp.gnu.org/gnu/autoconf/autoconf-${AUTOCONF_VERSION}.tar.gz \
+    && tar xzf autoconf-${AUTOCONF_VERSION}.tar.gz  \
+    && cd autoconf-${AUTOCONF_VERSION} \
+    && ./configure --prefix=/usr/ && make -j && make install && autoconf -V \
+    && cd .. && rm -rf autoconf-${AUTOCONF_VERSION}.tar.gz
 
 # install automake
-# RUN wget --no-check-certificate https://ftpmirror.gnu.org/gnu/automake/automake-${AUTOMAKE_VERSION}.tar.gz \
-#     && tar xzf automake-${AUTOMAKE_VERSION}.tar.gz \
-#     && cd automake-${AUTOMAKE_VERSION} \
-#     && ./configure --prefix=/usr --libdir=/usr/lib64 \
-#     && make -j$(nproc) && make install \
-#     && automake --version \
-#     && cd .. && rm -rf automake-${AUTOMAKE_VERSION}*
+RUN wget --no-check-certificate https://ftp.gnu.org/gnu/automake/automake-${AUTOMAKE_VERSION}.tar.gz \
+    && tar xzf automake-${AUTOMAKE_VERSION}.tar.gz \
+    && cd automake-${AUTOMAKE_VERSION} \
+    && ./configure --prefix=/usr --libdir=/usr/lib64 \
+    && make -j && make install \
+    && automake --version \
+    && cd .. && rm -rf automake-${AUTOMAKE_VERSION}.tar.gz
 
 # install libtool
 RUN wget --no-check-certificate https://ftpmirror.gnu.org/libtool/libtool-${LIBTOOL_VERSION}.tar.gz \
