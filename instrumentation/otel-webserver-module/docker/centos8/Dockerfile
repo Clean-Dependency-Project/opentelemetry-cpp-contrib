@@ -63,7 +63,12 @@ RUN dnf install -y gcc-toolset-9 && \
 
 ENV PATH="/opt/rh/gcc-toolset-9/root/usr/bin:${PATH}"
 
-
+#install autoconf
+RUN wget -4 --no-check-certificate https://ftpmirror.gnu.org/gnu/autoconf/autoconf-${AUTOCONF_VERSION}.tar.gz \
+    && tar xzf autoconf-${AUTOCONF_VERSION}.tar.gz  \
+    && cd autoconf-${AUTOCONF_VERSION} \
+    && ./configure --prefix=/usr/ && make -j && make install && autoconf -V \
+    && cd .. && rm -rf autoconf-${AUTOCONF_VERSION}.tar.gz
 
 #install automake
 RUN wget -4 http://ftpmirror.gnu.org/gnu/automake/automake-${AUTOMAKE_VERSION}.tar.gz \
@@ -74,14 +79,6 @@ RUN wget -4 http://ftpmirror.gnu.org/gnu/automake/automake-${AUTOMAKE_VERSION}.t
     && automake --version \
     && cd .. && rm -rf automake-${AUTOMAKE_VERSION}*
 
-#install autoconf
-RUN wget -4 --no-check-certificate https://ftpmirror.gnu.org/gnu/autoconf/autoconf-${AUTOCONF_VERSION}.tar.gz \
-    && tar xzf autoconf-${AUTOCONF_VERSION}.tar.gz  \
-    && cd autoconf-${AUTOCONF_VERSION} \
-    && ./configure --prefix=/usr/ && make -j && make install && autoconf -V \
-    && cd .. && rm -rf autoconf-${AUTOCONF_VERSION}.tar.gz
-
-    
 # install python 2.7.8
 RUN wget http://www.python.org/ftp/python/${PYTHON_VERSION}/Python-${PYTHON_VERSION}.tar.xz \
     && unxz Python-${PYTHON_VERSION}.tar.xz \
