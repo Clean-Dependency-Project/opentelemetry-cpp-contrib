@@ -16,7 +16,7 @@ ARG NGINX_VERSION="1.29.3"
 ARG OPENTELEMETRY_VERSION="1.23.0"
 ARG BOOST_VERSION="1.75.0"
 ARG BOOST_FILENAME="boost_1_75_0"
-ARG PYTHON_VERSION="2.7.18"
+ARG PYTHON_VERSION="2.7.8"
 
 # ------------------------------------------------------------------------
 # Install system tools & build chain
@@ -33,14 +33,13 @@ RUN dnf -y update && \
 # ------------------------------------------------------------------------
 # Build Python 2.7 from source (for GYP)
 # ------------------------------------------------------------------------
-RUN mkdir /tmp/python2 && cd /tmp/python2 && \
-    wget https://www.python.org/ftp/python/${PYTHON_VERSION}/Python-${PYTHON_VERSION}.tar.xz && \
-    tar -xf Python-${PYTHON_VERSION}.tar.xz && cd Python-${PYTHON_VERSION} && \
-    ./configure --prefix=/usr/local --enable-optimizations && \
-    make -j$(nproc) && make altinstall && \
-    ln -sf /usr/local/bin/python2.7 /usr/bin/python && \
-    python --version && \
-    cd / && rm -rf /tmp/python2
+# install python 2.7.8
+RUN wget http://www.python.org/ftp/python/${PYTHON_VERSION}/Python-${PYTHON_VERSION}.tar.xz \
+    && unxz Python-${PYTHON_VERSION}.tar.xz \
+    && tar -xf Python-${PYTHON_VERSION}.tar \
+    && cd Python-${PYTHON_VERSION} && ./configure --prefix=/usr/local && make && make install \
+    && cd .. \
+    && rm -rf Python-${PYTHON_VERSION}.tar.xz && rm -rf Python-${PYTHON_VERSION}.tar
 
 # ------------------------------------------------------------------------
 # Build dependency directories
