@@ -16,19 +16,30 @@ ARG NGINX_VERSION="1.29.3"
 ARG OPENTELEMETRY_VERSION="1.23.0"
 ARG BOOST_VERSION="1.75.0"
 ARG BOOST_FILENAME="boost_1_75_0"
+ARG PYTHON_VERSION="2.7.18"
 
 # ------------------------------------------------------------------------
-# Install core tools & build chain
+# Install system tools & build chain
 # ------------------------------------------------------------------------
 RUN dnf -y update && \
     dnf install -y \
         gcc-toolset-13 git make wget curl tar xz unzip which cmake3 \
-        zlib-devel openssl-devel pcre-devel \
+        zlib-devel openssl-devel pcre-devel bzip2-devel \
         java-17-openjdk java-17-openjdk-devel \
-        perl m4 autoconf automake libtool python2 && \
-    ln -sf /usr/bin/python2 /usr/bin/python && \
-    python --version && \
+        perl m4 autoconf automake libtool && \
     dnf clean all
+
+# ------------------------------------------------------------------------
+# Build Python 2.7 from source (for GYP)
+# ------------------------------------------------------------------------
+RUN mkdir /tmp/python2 && cd /tmp/python2 && \
+    wget https://www.python.org/ftp/python/${PYTHON_VERSION}/Python-${PYTHON_VERSION}.tar.xz && \
+    tar -xf Python-${PYTHON_VERSION}.tar.xz && cd Python-${PYTHON_VERSION} && \
+    ./configure --prefix=/usr/local --enable-optimizations && \
+    make -j$(nproc) && make altinstall && \
+    ln -sf /usr/local/bin/python2.7 /usr/bin/python && \
+    python --version && \
+    cd / && rm -rf /tmp/python2
 
 # ------------------------------------------------------------------------
 # Build dependency directories
@@ -82,14 +93,14 @@ RUN mkdir -p dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/{lib,include} &
     cd .. && rm -rf opentelemetry-cpp
 
 # ------------------------------------------------------------------------
-# Download Nginx sources (for headers)
+# Download Nginx sources (for header inclusion during build)
 # ------------------------------------------------------------------------
 RUN wget http://nginx.org/download/nginx-${NGINX_VERSION}.tar.gz && \
     tar -xvf nginx-${NGINX_VERSION}.tar.gz -C /build-dependencies && \
     rm -f nginx-${NGINX_VERSION}.tar.gz
 
 # ------------------------------------------------------------------------
-# Copy source & build OTel Nginx module
+# Build OTel module with Gradle
 # ------------------------------------------------------------------------
 COPY . /otel-webserver-module
 RUN cp -r /dependencies /otel-webserver-module/ && \
@@ -97,7 +108,7 @@ RUN cp -r /dependencies /otel-webserver-module/ && \
     cd /otel-webserver-module && ./gradlew assembleWebServerModule
 
 # ------------------------------------------------------------------------
-# Install Nginx 1.29.3
+# Install Nginx 1.29.3 (binary)
 # ------------------------------------------------------------------------
 RUN echo "[nginx]" > /etc/yum.repos.d/nginx.repo && \
     echo "name=nginx repo" >> /etc/yum.repos.d/nginx.repo && \
@@ -111,7 +122,7 @@ RUN echo "[nginx]" > /etc/yum.repos.d/nginx.repo && \
     dnf clean all
 
 # ------------------------------------------------------------------------
-# Configure Nginx with OTel module
+# Configure Nginx with OpenTelemetry module
 # ------------------------------------------------------------------------
 RUN cd /otel-webserver-module/build && \
     tar -xf opentelemetry-webserver-sdk-x64-linux.tgz && \
@@ -122,7 +133,7 @@ RUN cd /otel-webserver-module/build && \
     sed -i "33i include /opt/opentelemetry_module.conf;" /etc/nginx/nginx.conf
 
 # ------------------------------------------------------------------------
-# Clean up
+# Clean up build artifacts
 # ------------------------------------------------------------------------
 RUN rm -rf /grpc /cmake-* /autoconf-* /automake-* /libtool-* /Python-* \
     && rm -rf /var/cache/dnf/* /tmp/*
