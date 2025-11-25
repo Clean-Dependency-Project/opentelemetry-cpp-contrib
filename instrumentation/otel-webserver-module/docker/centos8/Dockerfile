@@ -16,6 +16,12 @@ ARG NGINX_VERSION="1.29.3"
 ARG OPENTELEMETRY_VERSION="1.23.0"
 ARG BOOST_VERSION="1.75.0"
 ARG GRPC_VERSION="1.57.0"
+ARG LOG4CXX_VERSION="0.11.0"
+ARG APR_VERSION="1.7.0"
+ARG EXPAT_VERSION="2.3.0"
+ARG EXPAT_RVERSION="R_2_3_0"
+ARG LIBTOOL_VERSION="2.4.6"
+ARG APRUTIL_VERSION="1.6.1"
 ARG BOOST_FILENAME="boost_1_75_0"
 ARG PYTHON_VERSION="2.7.8"
 
@@ -71,6 +77,37 @@ RUN git clone https://github.com/grpc/grpc \
   && make install \
   && cd ../../..
 
+
+#install Apr
+RUN mkdir -p dependencies/apr/${APR_VERSION} \
+    && wget https://archive.apache.org/dist/apr/apr-${APR_VERSION}.tar.gz --no-check-certificate \
+    && tar -xf apr-${APR_VERSION}.tar.gz \
+    && cd apr-${APR_VERSION} \
+    && ./configure --prefix=/dependencies/apr/${APR_VERSION} --enable-static=yes --enable-shared=no --with-pic && echo $? \
+    && make -j 6 \
+    && make install \
+    && cd ../ && rm -rf apr-${APR_VERSION} && rm -rf apr-${APR_VERSION}.tar.gz
+
+# install libexpat
+RUN mkdir -p dependencies/expat/${EXPAT_VERSION} \
+    && wget https://github.com/libexpat/libexpat/releases/download/${EXPAT_RVERSION}/expat-${EXPAT_VERSION}.tar.gz --no-check-certificate \
+    && tar -xf expat-${EXPAT_VERSION}.tar.gz \
+    && cd expat-${EXPAT_VERSION} \
+    && ./configure --prefix=/dependencies/expat/${EXPAT_VERSION} --enable-static=yes --enable-shared=no --with-pic && echo $? \
+    && make -j 6 \
+    && make install \
+    && cd ../ && rm -rf expat-${EXPAT_VERSION} && rm -rf expat-${EXPAT_VERSION}.tar.gz
+
+# install Apr-util
+RUN mkdir -p dependencies/apr-util/${APRUTIL_VERSION} \
+    && wget https://archive.apache.org/dist/apr/apr-util-${APRUTIL_VERSION}.tar.gz --no-check-certificate \
+    && tar -xf apr-util-${APRUTIL_VERSION}.tar.gz \
+    && cd apr-util-${APRUTIL_VERSION} \
+    && ./configure --prefix=/dependencies/apr-util/${APRUTIL_VERSION} --enable-static=yes --enable-shared=no --with-pic --with-apr=/dependencies/apr/${APR_VERSION} --with-expat=/dependencies/expat/${EXPAT_VERSION} && echo $? \
+    && make -j 6 \
+    && make install \
+    && cd ../ && rm -rf apr-util-${APRUTIL_VERSION} && rm -rf apr-util-${APRUTIL_VERSION}.tar.gz
+
 # ------------------------------------------------------------------------
 # Install OpenTelemetry C++ (v1.23.0)
 # ------------------------------------------------------------------------
@@ -113,6 +150,17 @@ RUN wget http://nginx.org/download/nginx-${NGINX_VERSION}.tar.gz && \
     tar -xvf nginx-${NGINX_VERSION}.tar.gz -C /build-dependencies && \
     rm -f nginx-${NGINX_VERSION}.tar.gz
 
+
+#install log4cxx
+RUN mkdir -p dependencies/apache-log4cxx/${LOG4CXX_VERSION} \
+    && wget https://archive.apache.org/dist/logging/log4cxx/${LOG4CXX_VERSION}/apache-log4cxx-${LOG4CXX_VERSION}.tar.gz --no-check-certificate \
+    && tar -xf apache-log4cxx-${LOG4CXX_VERSION}.tar.gz \
+    && cd apache-log4cxx-${LOG4CXX_VERSION} \
+    && ./configure --prefix=/dependencies/apache-log4cxx/${LOG4CXX_VERSION}/ --enable-static=yes --enable-shared=no --with-pic --with-apr=/dependencies/apr/${APR_VERSION}/ --with-apr-util=/dependencies/apr-util/${APRUTIL_VERSION}/ && echo $? \
+    && make -j 6 ; echo 0 \
+    && automake --add-missing \
+    && make install \
+    && cd .. && rm -rf apache-log4cxx-${LOG4CXX_VERSION}.tar.gz && rm -rf apache-log4cxx-${LOG4CXX_VERSION}
 # ------------------------------------------------------------------------
 # Build OTel module with Gradle
 # ------------------------------------------------------------------------
