@@ -111,37 +111,28 @@ RUN mkdir -p dependencies/apr-util/${APRUTIL_VERSION} \
 # ------------------------------------------------------------------------
 # Install OpenTelemetry C++ (v1.23.0)
 # ------------------------------------------------------------------------
-RUN mkdir -p dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/{lib,include} && \
-    git clone https://github.com/open-telemetry/opentelemetry-cpp && \
-    cd opentelemetry-cpp && \
-    git checkout tags/v${OPENTELEMETRY_VERSION} -b v${OPENTELEMETRY_VERSION} && \
-    git submodule update --init --recursive && \
-    mkdir build && cd build && \
-    cmake .. \
-        -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
-        -DBUILD_TESTING=OFF \
-        -DBUILD_SHARED_LIBS=ON \
-        -DWITH_OTLP=ON \
-        -DCMAKE_INSTALL_PREFIX=/dependencies/opentelemetry/${OPENTELEMETRY_VERSION} && \
-    cmake --build . --target all -j$(nproc) && \
-    cd .. && \
-    find . -name "*.so" -type f -exec cp {} /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/lib/ \; && \
-    if [ -f build/libopentelemetry_proto.a ]; then \
-         cp build/libopentelemetry_proto.a /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/lib/; \
-     else \
-         echo "⚠️  libopentelemetry_proto.a not found — continuing"; \
-     fi && \
-    cp -r api/include/ /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/ && \
-    for dir in exporters/*; do \
-        if [ -d "$dir/include" ]; then \
-            cp -rf "$dir/include" /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/; \
-        fi; \
-    done && \
-    cp -r sdk/include/ /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/ && \
-    mkdir -p /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/include/opentelemetry/proto && \
-    cp -r build/generated/third_party/opentelemetry-proto/opentelemetry/proto/ \
-        /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/include/opentelemetry/ || true && \
-    cd .. && rm -rf opentelemetry-cpp
+RUN mkdir -p dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/lib \
+    && mkdir -p dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/include \
+    && git clone --depth 1 --branch v${OPENTELEMETRY_VERSION} https://github.com/open-telemetry/opentelemetry-cpp.git \
+    && cd opentelemetry-cpp \
+    && git submodule update --init --recursive \
+    && mkdir build && cd build \
+    && cmake .. \
+         -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
+         -DBUILD_TESTING=OFF \
+         -DBUILD_SHARED_LIBS=ON \
+         -DWITH_OTLP=ON \
+         -DWITH_ABSEIL=ON \
+         -DCMAKE_INSTALL_PREFIX=/dependencies/opentelemetry/${OPENTELEMETRY_VERSION} \
+    && cmake --build . --target all -j$(nproc) \
+    && cmake --install . \
+    && cd .. \
+    && cp -r build/generated/third_party/opentelemetry-proto/opentelemetry/proto \
+         /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/include/opentelemetry/ \
+    && find build -name "*.so" -exec cp {} /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/lib/ \; \
+    && echo "===== [DEBUG] OTel include files =====" && find /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/include -type f | sort \
+    && echo "===== [DEBUG] OTel libs =====" && ls -l /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/lib \
+    && cd / && rm -rf opentelemetry-cpp
 
 # ------------------------------------------------------------------------
 # Download Nginx sources (for header inclusion during build)
