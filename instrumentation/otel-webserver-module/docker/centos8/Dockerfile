@@ -23,11 +23,12 @@ ARG PYTHON_VERSION="2.7.18"
 # ------------------------------------------------------------------------
 RUN dnf -y update && \
     dnf install -y \
-        gcc-toolset-13 git make wget curl tar xz unzip which cmake3 \
+        gcc-toolset-13 git make wget tar xz unzip which cmake3 \
         zlib-devel openssl-devel pcre-devel bzip2-devel \
         java-17-openjdk java-17-openjdk-devel \
         perl m4 autoconf automake libtool && \
     dnf clean all
+
 
 # ------------------------------------------------------------------------
 # Build Python 2.7 from source (for GYP)
