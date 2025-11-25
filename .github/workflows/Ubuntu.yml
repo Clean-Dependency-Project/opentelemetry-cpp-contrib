@@ -1,7 +1,7 @@
 name: webserver ubuntu
 
 on:
-  workflow_dispatch:
+  push:
 
 jobs:
   webserver-build-test-ubuntu:
