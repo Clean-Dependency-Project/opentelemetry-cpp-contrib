@@ -15,6 +15,7 @@ ENV PATH="/opt/rh/gcc-toolset-13/root/usr/bin:${PATH}"
 ARG NGINX_VERSION="1.29.3"
 ARG OPENTELEMETRY_VERSION="1.23.0"
 ARG BOOST_VERSION="1.75.0"
+ARG GRPC_VERSION="1.57.0"
 ARG BOOST_FILENAME="boost_1_75_0"
 ARG PYTHON_VERSION="2.7.8"
 
@@ -56,6 +57,19 @@ RUN wget https://archives.boost.io/release/${BOOST_VERSION}/source/${BOOST_FILEN
     ./b2 install define=BOOST_ERROR_CODE_HEADER_ONLY link=static threading=multi \
         cxxflags="-fvisibility=hidden -fPIC" cflags="-fvisibility=hidden -fPIC" && \
     cd .. && rm -rf ${BOOST_FILENAME}*
+
+
+RUN git clone https://github.com/grpc/grpc \
+  && cd grpc \
+  && git checkout tags/v${GRPC_VERSION} -b v${GRPC_VERSION} \
+  && git submodule update --init \
+  && sed -i "s/target_link_libraries(bssl ssl crypto)/target_link_libraries(bssl ssl crypto rt)/g" third_party/boringssl-with-bazel/CMakeLists.txt \
+  && mkdir -p cmake/build \
+  && cd cmake/build \
+  && cmake ../.. -DgRPC_INSTALL=ON -DCMAKE_BUILD_TYPE=Release -DgRPC_ABSL_PROVIDER=module -DgRPC_CARES_PROVIDER=module -DgRPC_PROTOBUF_PROVIDER=module -DgRPC_RE2_PROVIDER=module -DgRPC_SSL_PROVIDER=module -DgRPC_ZLIB_PROVIDER=module \
+  && make \
+  && make install \
+  && cd ../../..
 
 # ------------------------------------------------------------------------
 # Install OpenTelemetry C++ (v1.23.0)
