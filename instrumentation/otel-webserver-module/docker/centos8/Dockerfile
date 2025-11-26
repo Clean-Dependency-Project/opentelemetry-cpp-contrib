@@ -111,8 +111,12 @@ RUN mkdir -p dependencies/apr-util/${APRUTIL_VERSION} \
 # ------------------------------------------------------------------------
 # Install OpenTelemetry C++ (v1.23.0)
 # ------------------------------------------------------------------------
-RUN mkdir -p dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/lib \
-    && mkdir -p dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/include \
+# ------------------------------------------------------------------------
+# Build and install OpenTelemetry C++ SDK 1.23.0 (robust proto copy)
+# ------------------------------------------------------------------------
+ARG OPENTELEMETRY_VERSION="1.23.0"
+
+RUN mkdir -p dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/{lib,include} \
     && git clone --depth 1 --branch v${OPENTELEMETRY_VERSION} https://github.com/open-telemetry/opentelemetry-cpp.git \
     && cd opentelemetry-cpp \
     && git submodule update --init --recursive \
@@ -127,12 +131,21 @@ RUN mkdir -p dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/lib \
     && cmake --build . --target all -j$(nproc) \
     && cmake --install . \
     && cd .. \
-    && cp -r build/generated/third_party/opentelemetry-proto/opentelemetry/proto \
-         /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/include/opentelemetry/ \
-    && find build -name "*.so" -exec cp {} /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/lib/ \; \
-    && echo "===== [DEBUG] OTel include files =====" && find /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/include -type f | sort \
-    && echo "===== [DEBUG] OTel libs =====" && ls -l /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/lib \
+    # Try all possible proto paths
+    && echo "🔍 Searching for generated proto headers..." && \
+       PROTO_PATH=$(find . -type d -path "*/opentelemetry/proto" | head -n 1 || true) && \
+       if [ -n "$PROTO_PATH" ]; then \
+         echo "✅ Found proto path: $PROTO_PATH"; \
+         mkdir -p /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/include/opentelemetry/; \
+         cp -r "$PROTO_PATH" /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/include/opentelemetry/; \
+       else \
+         echo "⚠️  No proto directory found. Skipping copy."; \
+       fi && \
+    find build -name "*.so" -exec cp {} /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/lib/ \; \
+    && echo "===== [DEBUG] OTel include files =====" && find /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/include -type f | sort || true \
+    && echo "===== [DEBUG] OTel libs =====" && ls -l /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/lib || true \
     && cd / && rm -rf opentelemetry-cpp
+
 
 # ------------------------------------------------------------------------
 # Download Nginx sources (for header inclusion during build)
