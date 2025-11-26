@@ -133,11 +133,11 @@ RUN mkdir -p dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/lib \
     && cd ../ \
     # Copy all relevant headers and libs for downstream Gradle build
     && find . -name "*.so" -type f -exec cp {} /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/lib/ \; \
-    && cp -r api/include/ /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/ \
-    && cp -r sdk/include/ /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/ \
-    && cp -r exporters/include/ /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/ \
-    && cp -r exporters/otlp/include/ /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/ \
-    && cp -r ext/include/ /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/ || true \
+    && cp -r api/include/* /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/ \
+    && cp -r sdk/include/* /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/ \
+    && cp -r exporters/include/* /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/ \
+    && cp -r exporters/otlp/include/* /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/ \
+    && cp -r ext/include/* /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/ || true \
     && cp -r build/generated/third_party/opentelemetry-proto/opentelemetry/proto/ \
        /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/include/opentelemetry/ || true \
     && cd .. && rm -rf opentelemetry-cpp
