@@ -21,7 +21,7 @@ ARG EXPAT_RVERSION="R_2_3_0"
 ARG PYTHON_VERSION="2.7.8"
 
 # ========================================================================
-# System deps
+# System basic deps
 # ========================================================================
 RUN dnf -y update && \
     dnf install -y \
@@ -122,22 +122,27 @@ RUN cd /tmp && tar -xf apr-util-${APRUTIL_VERSION}.tar.gz && \
     rm -rf /tmp/apr-util-${APRUTIL_VERSION}*
 
 # ========================================================================
-# LOG4CXX
+# LOG4CXX (FIXED BUILD: autoreconf first)
 # ========================================================================
 ADD https://archive.apache.org/dist/logging/log4cxx/${LOG4CXX_VERSION}/apache-log4cxx-${LOG4CXX_VERSION}.tar.gz /tmp/
 
-RUN cd /tmp && tar -xf apache-log4cxx-${LOG4CXX_VERSION}.tar.gz && \
+RUN cd /tmp && \
+    tar -xf apache-log4cxx-${LOG4CXX_VERSION}.tar.gz && \
     cd apache-log4cxx-${LOG4CXX_VERSION} && \
+    autoreconf -fi && \
     ./configure \
-       --prefix=/dependencies/apache-log4cxx/${LOG4CXX_VERSION} \
-       --enable-static=yes --enable-shared=no --with-pic \
-       --with-apr=/dependencies/apr/${APR_VERSION} \
-       --with-apr-util=/dependencies/apr-util/${APRUTIL_VERSION} && \
-    make -j$(nproc) && automake --add-missing && make install && \
-    rm -rf /tmp/apache-log4cxx-${LOG4CXX_VERSION}*
+        --prefix=/dependencies/apache-log4cxx/${LOG4CXX_VERSION} \
+        --enable-static=yes \
+        --enable-shared=no \
+        --with-pic \
+        --with-apr=/dependencies/apr/${APR_VERSION} \
+        --with-apr-util=/dependencies/apr-util/${APRUTIL_VERSION} && \
+    make -j$(nproc) && \
+    make install && \
+    cd /tmp && rm -rf apache-log4cxx-${LOG4CXX_VERSION}*
 
 # ========================================================================
-# OpenTelemetry C++ SDK (using system gRPC/protobuf)
+# OpenTelemetry C++ SDK (Correct include copy — no double nesting)
 # ========================================================================
 RUN git clone --depth=1 --branch v${OPENTELEMETRY_VERSION} https://github.com/open-telemetry/opentelemetry-cpp /tmp/opentelemetry-cpp && \
     cd /tmp/opentelemetry-cpp && git submodule update --init --recursive && \
@@ -160,7 +165,7 @@ RUN git clone --depth=1 --branch v${OPENTELEMETRY_VERSION} https://github.com/op
     rm -rf /tmp/opentelemetry-cpp
 
 # ========================================================================
-# Download NGINX sources
+# Download NGINX source
 # ========================================================================
 ADD http://nginx.org/download/nginx-${NGINX_VERSION}.tar.gz /tmp/
 
@@ -177,7 +182,7 @@ RUN cp -r /dependencies /otel-webserver-module/ && \
     cd /otel-webserver-module && ./gradlew assembleWebServerModule
 
 # ========================================================================
-# Install Nginx + OpenTelemetry module
+# Install Nginx and OpenTelemetry Module
 # ========================================================================
 RUN echo "[nginx]" > /etc/yum.repos.d/nginx.repo && \
     echo "name=nginx repo" >> /etc/yum.repos.d/nginx.repo && \
