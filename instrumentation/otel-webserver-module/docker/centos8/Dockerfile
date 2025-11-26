@@ -35,6 +35,19 @@ RUN dnf -y update && \
     dnf clean all
 
 # ------------------------------------------------------------------------
+# Force g++ to ALWAYS use C++14 (wrapper)
+# ------------------------------------------------------------------------
+RUN printf '#!/bin/bash\n' \
+    'REAL_GPP=/opt/rh/gcc-toolset-13/root/usr/bin/g++\n' \
+    'args=()\n' \
+    'for a in "$@"; do\n' \
+    '  if [ "$a" = "-std=c++11" ]; then continue; fi\n' \
+    '  args+=("$a")\n' \
+    'done\n' \
+    'exec "$REAL_GPP" "${args[@]}" -std=c++14\n' \
+    > /usr/local/bin/g++ && chmod +x /usr/local/bin/g++
+
+# ------------------------------------------------------------------------
 # Build Python 2.7 (required by GYP)
 # ------------------------------------------------------------------------
 RUN wget http://www.python.org/ftp/python/${PYTHON_VERSION}/Python-${PYTHON_VERSION}.tar.xz \
