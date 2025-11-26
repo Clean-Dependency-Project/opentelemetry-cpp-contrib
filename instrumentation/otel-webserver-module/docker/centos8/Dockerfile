@@ -32,15 +32,14 @@ RUN dnf -y update && \
     dnf clean all
 
 # ========================================================================
-# Enable CRB + EPEL for gRPC / Abseil / Protobuf / re2
+# Enable CRB + EPEL + EPEL-next
 # ========================================================================
-RUN dnf install -y epel-release && \
+RUN dnf install -y epel-release epel-next-release && \
     dnf config-manager --set-enabled crb && \
-    dnf config-manager --set-enabled powertools && \
     dnf makecache
 
 # ========================================================================
-# Install system gRPC, protobuf, abseil, re2, c-ares
+# Install system gRPC, Protobuf, Abseil, re2, c-ares
 # ========================================================================
 RUN dnf install -y \
        grpc \
@@ -153,11 +152,11 @@ RUN git clone --depth=1 --branch v${OPENTELEMETRY_VERSION} https://github.com/op
       -DProtobuf_PROTOC_EXECUTABLE=/usr/bin/protoc \
       -DCMAKE_INSTALL_PREFIX=/dependencies/opentelemetry/${OPENTELEMETRY_VERSION} && \
     make -j$(nproc) && make install && cd .. && \
-    mkdir -p /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/include/opentelemetry && \
-    cp -r api/include/opentelemetry /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/include/ && \
-    cp -r sdk/include/opentelemetry /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/include/ && \
-    cp -r exporters/include/opentelemetry /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/include/ && \
-    cp -r ext/include/opentelemetry /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/include/ || true && \
+    mkdir -p /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/include && \
+    cp -r api/include/* /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/include/ && \
+    cp -r sdk/include/* /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/include/ && \
+    cp -r exporters/include/* /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/include/ && \
+    cp -r ext/include/* /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/include/ || true && \
     rm -rf /tmp/opentelemetry-cpp
 
 # ========================================================================
