@@ -108,7 +108,7 @@ task gypLibrary(type: Exec) {
     ext.libraryBuildEnvironment = [
         ARCH_FLAG: gccArchFlag,
         ANSDK_DIR: modDepDir,
-        COMPILER_FLAGS: (coverageEnabled) ? coverageCompilerFlags : '',
+        COMPILER_FLAGS: "-std=c++14 " + ((coverageEnabled) ? coverageCompilerFlags : ''),
         LINKER_FLAGS: (coverageEnabled) ? coverageLinkerFlags : '',
         BOOST_LIB: BOOST_LIB,
         BOOST_INCLUDE: BOOST_INCLUDE,
