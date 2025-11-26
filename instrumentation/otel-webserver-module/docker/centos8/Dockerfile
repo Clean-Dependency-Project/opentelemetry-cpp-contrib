@@ -32,6 +32,30 @@ RUN dnf -y update && \
     dnf clean all
 
 # ========================================================================
+# Enable CRB + EPEL for gRPC / Abseil / Protobuf / re2
+# ========================================================================
+RUN dnf install -y epel-release && \
+    dnf config-manager --set-enabled crb && \
+    dnf config-manager --set-enabled powertools && \
+    dnf makecache
+
+# ========================================================================
+# Install system gRPC, protobuf, abseil, re2, c-ares
+# ========================================================================
+RUN dnf install -y \
+       grpc \
+       grpc-devel \
+       protobuf \
+       protobuf-devel \
+       abseil-cpp \
+       abseil-cpp-devel \
+       re2 \
+       re2-devel \
+       c-ares \
+       c-ares-devel \
+    && dnf clean all
+
+# ========================================================================
 # Python 2.7 for GYP
 # ========================================================================
 RUN wget http://www.python.org/ftp/python/${PYTHON_VERSION}/Python-${PYTHON_VERSION}.tar.xz \
@@ -58,20 +82,6 @@ RUN cd /tmp && tar -xvf ${BOOST_FILENAME}.tar.gz && \
        cxxflags="-fvisibility=hidden -fPIC" \
        cflags="-fvisibility=hidden -fPIC" && \
     rm -rf /tmp/${BOOST_FILENAME}*
-
-# ========================================================================
-# REPLACE SLOW gRPC SOURCE BUILD WITH SYSTEM PACKAGES
-# ========================================================================
-RUN dnf install -y \
-       grpc \
-       grpc-devel \
-       protobuf \
-       protobuf-devel \
-       abseil-cpp \
-       abseil-cpp-devel \
-       re2-devel \
-       c-ares-devel \
-    && dnf clean all
 
 # ========================================================================
 # APR
@@ -128,7 +138,7 @@ RUN cd /tmp && tar -xf apache-log4cxx-${LOG4CXX_VERSION}.tar.gz && \
     rm -rf /tmp/apache-log4cxx-${LOG4CXX_VERSION}*
 
 # ========================================================================
-# OpenTelemetry C++ SDK (now uses system gRPC)
+# OpenTelemetry C++ SDK (using system gRPC/protobuf)
 # ========================================================================
 RUN git clone --depth=1 --branch v${OPENTELEMETRY_VERSION} https://github.com/open-telemetry/opentelemetry-cpp /tmp/opentelemetry-cpp && \
     cd /tmp/opentelemetry-cpp && git submodule update --init --recursive && \
@@ -159,7 +169,7 @@ RUN tar -xvf /tmp/nginx-${NGINX_VERSION}.tar.gz -C /build-dependencies && \
     rm -rf /tmp/nginx-${NGINX_VERSION}.tar.gz
 
 # ========================================================================
-# Build your WebServer Module (Gradle)
+# Build WebServer Module (Gradle)
 # ========================================================================
 COPY . /otel-webserver-module
 
@@ -168,7 +178,7 @@ RUN cp -r /dependencies /otel-webserver-module/ && \
     cd /otel-webserver-module && ./gradlew assembleWebServerModule
 
 # ========================================================================
-# Install Nginx + configure module
+# Install Nginx + OpenTelemetry module
 # ========================================================================
 RUN echo "[nginx]" > /etc/yum.repos.d/nginx.repo && \
     echo "name=nginx repo" >> /etc/yum.repos.d/nginx.repo && \
