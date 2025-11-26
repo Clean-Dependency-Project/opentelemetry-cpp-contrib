@@ -113,8 +113,8 @@ RUN mkdir -p dependencies/apr-util/${APRUTIL_VERSION} \
 # ------------------------------------------------------------------------
 ARG OPENTELEMETRY_VERSION="1.23.0"
 
-RUN mkdir -p dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/lib \
-    && mkdir -p dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/include \
+RUN mkdir -p /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/lib \
+    && mkdir -p /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/include \
     && git clone https://github.com/open-telemetry/opentelemetry-cpp.git \
     && cd opentelemetry-cpp \
     && git checkout tags/v${OPENTELEMETRY_VERSION} -b v${OPENTELEMETRY_VERSION} \
@@ -131,16 +131,29 @@ RUN mkdir -p dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/lib \
     && cmake --build . --target all -j$(nproc) \
     && cmake --install . \
     && cd ../ \
-    # Copy all relevant headers and libs for downstream Gradle build
-    && find . -name "*.so" -type f -exec cp {} /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/lib/ \; \
-    && cp -r api/include/* /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/ \
-    && cp -r sdk/include/* /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/ \
-    && cp -r exporters/include/* /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/ \
-    && cp -r exporters/otlp/include/* /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/ \
-    && cp -r ext/include/* /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/ || true \
-    && cp -r build/generated/third_party/opentelemetry-proto/opentelemetry/proto/ \
-       /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/include/opentelemetry/ || true \
+    \
+    # ------------------------------
+    # FIXED INCLUDE PATH COPIES
+    # ------------------------------
+    && cp -r api/include/opentelemetry \
+           /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/include/ \
+    && cp -r sdk/include/opentelemetry \
+           /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/include/ \
+    && cp -r exporters/include/opentelemetry \
+           /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/include/ \
+    && cp -r ext/include/opentelemetry \
+           /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/include/ || true \
+    \
+    # proto includes (optional)
+    && cp -r build/generated/third_party/opentelemetry-proto/opentelemetry \
+           /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/include/ || true \
+    \
+    # .so libs
+    && find . -name "*.so" -type f -exec cp {} \
+         /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/lib/ \; \
+    \
     && cd .. && rm -rf opentelemetry-cpp
+
 
 # ------------------------------------------------------------------------
 # Download Nginx sources (for header inclusion during build)
