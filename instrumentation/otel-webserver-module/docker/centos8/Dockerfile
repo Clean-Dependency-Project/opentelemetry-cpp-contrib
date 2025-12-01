@@ -148,6 +148,8 @@ RUN mkdir -p dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/lib \
         -DWITH_OTLP=ON \
         -DWITH_OTLP_GRPC=ON \
         -DWITH_OTLP_HTTP=ON \
+        -DCMAKE_CXX_STANDARD=14 \
+        -DCMAKE_CXX_STANDARD_REQUIRED=ON \
         -DCMAKE_PREFIX_PATH="/usr" \
         -DProtobuf_INCLUDE_DIR=/usr/include \
         -DgRPC_DIR=/usr/lib64/cmake/grpc \
