@@ -117,6 +117,20 @@ RUN mkdir -p dependencies/apr-util/${APRUTIL_VERSION} \
     && cd .. && rm -rf apr-util-${APRUTIL_VERSION}*
 
 # ------------------------------------------------------------------------
+# Build log4cxx
+# ------------------------------------------------------------------------
+RUN mkdir -p dependencies/apache-log4cxx/${LOG4CXX_VERSION} \
+    && wget https://archive.apache.org/dist/logging/log4cxx/${LOG4CXX_VERSION}/apache-log4cxx-${LOG4CXX_VERSION}.tar.gz --no-check-certificate \
+    && tar -xf apache-log4cxx-${LOG4CXX_VERSION}.tar.gz \
+    && cd apache-log4cxx-${LOG4CXX_VERSION} \
+    && ./configure --prefix=/dependencies/apache-log4cxx/${LOG4CXX_VERSION}/ \
+        --enable-static=yes --enable-shared=no --with-pic \
+        --with-apr=/dependencies/apr/${APR_VERSION}/ \
+        --with-apr-util=/dependencies/apr-util/${APRUTIL_VERSION}/ \
+    && make -j$(nproc) && make install \
+    && cd .. && rm -rf apache-log4cxx-${LOG4CXX_VERSION}*
+
+# ------------------------------------------------------------------------
 # Build OpenTelemetry C++ SDK
 # ------------------------------------------------------------------------
 RUN mkdir -p dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/lib \
@@ -154,23 +168,12 @@ RUN mkdir -p dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/lib \
 # ------------------------------------------------------------------------
 # Download Nginx source (needed by build)
 # ------------------------------------------------------------------------
-RUN wget http://nginx.org/download/nginx-${NGINX_VERSION}.tar.gz && \
-    tar -xvf nginx-${NGINX_VERSION}.tar.gz -C /build-dependencies && \
-    rm -f nginx-${NGINX_VERSION}.tar.gz
+RUN mkdir build-dependencies \
+    && wget http://nginx.org/download/nginx-${NGINX_VERSION}.tar.gz  \
+    && tar -xvf nginx-${NGINX_VERSION}.tar.gz -C /build-dependencies  \
+    && rm -f nginx-${NGINX_VERSION}.tar.gz
 
-# ------------------------------------------------------------------------
-# Build log4cxx
-# ------------------------------------------------------------------------
-RUN mkdir -p dependencies/apache-log4cxx/${LOG4CXX_VERSION} \
-    && wget https://archive.apache.org/dist/logging/log4cxx/${LOG4CXX_VERSION}/apache-log4cxx-${LOG4CXX_VERSION}.tar.gz --no-check-certificate \
-    && tar -xf apache-log4cxx-${LOG4CXX_VERSION}.tar.gz \
-    && cd apache-log4cxx-${LOG4CXX_VERSION} \
-    && ./configure --prefix=/dependencies/apache-log4cxx/${LOG4CXX_VERSION}/ \
-        --enable-static=yes --enable-shared=no --with-pic \
-        --with-apr=/dependencies/apr/${APR_VERSION}/ \
-        --with-apr-util=/dependencies/apr-util/${APRUTIL_VERSION}/ \
-    && make -j$(nproc) && make install \
-    && cd .. && rm -rf apache-log4cxx-${LOG4CXX_VERSION}*
+
 
 # ------------------------------------------------------------------------
 # COPY CODE + CRITICAL FIX
