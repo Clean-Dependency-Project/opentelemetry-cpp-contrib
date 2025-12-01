@@ -50,12 +50,12 @@ project.ext {
     scriptExt = 'sh'
     sharedLibraryExt = 'so'
     
-    apache22Version = "2.2.31"
-    apache24Version = "2.4.23"
+    // apache22Version = "2.2.31"
+    // apache24Version = "2.4.23"
     nginxSupportedVersions=props.get("nginxSupportedVersions").split(',')
 
     libraryStageDir = "${platBuildDir}/opentelemetry-webserver-sdk"
-    apacheStageDir = "${libraryStageDir}/WebServerModule/Apache"
+    // apacheStageDir = "${libraryStageDir}/WebServerModule/Apache"
     nginxStageDir = "${libraryStageDir}/WebServerModule/Nginx"
 
     coverageCompilerFlags = '-g -fprofile-arcs -ftest-coverage'
@@ -221,151 +221,151 @@ task assembleLibrary(type: Tar) {
     compression Compression.GZIP
 }
 
-// Apache
+// // Apache
 
-task extractApache(type: Copy) {
-    from "build-dependencies" 
-    into buildDir
-}
+// task extractApache(type: Copy) {
+//     from "build-dependencies" 
+//     into buildDir
+// }
 
-task bundleAprSources {
-    inputs.files extractApache
-    outputs.dir "${platBuildDir}/httpd-${apache22Version}"
-    outputs.dir "${platBuildDir}/httpd-${apache24Version}"
+// task bundleAprSources {
+//     inputs.files extractApache
+//     outputs.dir "${platBuildDir}/httpd-${apache22Version}"
+//     outputs.dir "${platBuildDir}/httpd-${apache24Version}"
 
-    doLast {
-        copy {
-            from "${buildDir}/httpd-${apache22Version}"
-            into "${platBuildDir}/httpd-${apache22Version}"
-        }
+//     doLast {
+//         copy {
+//             from "${buildDir}/httpd-${apache22Version}"
+//             into "${platBuildDir}/httpd-${apache22Version}"
+//         }
 
-        copy {
-            from "${buildDir}/httpd-${apache24Version}"
-            into "${platBuildDir}/httpd-${apache24Version}"
-        }
+//         copy {
+//             from "${buildDir}/httpd-${apache24Version}"
+//             into "${platBuildDir}/httpd-${apache24Version}"
+//         }
 
-        copy {
-            from "${buildDir}/apr-1.7.0"
-            into "${platBuildDir}/httpd-${apache22Version}/srclib/apr"
-        }
+//         copy {
+//             from "${buildDir}/apr-1.7.0"
+//             into "${platBuildDir}/httpd-${apache22Version}/srclib/apr"
+//         }
 
-        copy {
-            from "${buildDir}/apr-1.7.0"
-            into "${platBuildDir}/httpd-${apache24Version}/srclib/apr"
-        }
+//         copy {
+//             from "${buildDir}/apr-1.7.0"
+//             into "${platBuildDir}/httpd-${apache24Version}/srclib/apr"
+//         }
 
-        copy {
-            from "${buildDir}/apr-util-1.6.1"
-            into "${platBuildDir}/httpd-${apache22Version}/srclib/apr-util"
-        }
+//         copy {
+//             from "${buildDir}/apr-util-1.6.1"
+//             into "${platBuildDir}/httpd-${apache22Version}/srclib/apr-util"
+//         }
 
-        copy {
-            from "${buildDir}/apr-util-1.6.1"
-            into "${platBuildDir}/httpd-${apache24Version}/srclib/apr-util"
-        }
-    }
-}
+//         copy {
+//             from "${buildDir}/apr-util-1.6.1"
+//             into "${platBuildDir}/httpd-${apache24Version}/srclib/apr-util"
+//         }
+//     }
+// }
 
-task configureApache22(type: Exec) {
-    inputs.dir bundleAprSources
+// task configureApache22(type: Exec) {
+//     inputs.dir bundleAprSources
 
-    workingDir "${platBuildDir}/httpd-${apache22Version}"
-    commandLine './configure', '--with-included-apr'
-}
+//     workingDir "${platBuildDir}/httpd-${apache22Version}"
+//     commandLine './configure', '--with-included-apr'
+// }
 
-task configureApache24(type: Exec) {
-    inputs.dir extractApache
+// task configureApache24(type: Exec) {
+//     inputs.dir extractApache
 
-    workingDir "${platBuildDir}/httpd-${apache24Version}"
-    commandLine './configure', '--with-included-apr'
-}
+//     workingDir "${platBuildDir}/httpd-${apache24Version}"
+//     commandLine './configure', '--with-included-apr'
+// }
 
-task gypApacheModule(type: Exec) {
-    group = 'Apache Web Server Module'
-    description = 'Run gyp to generate the build files for Apache Web Server Module'
+// task gypApacheModule(type: Exec) {
+//     group = 'Apache Web Server Module'
+//     description = 'Run gyp to generate the build files for Apache Web Server Module'
 
-    dependsOn stageLibrary
-    dependsOn configureApache22
-    dependsOn configureApache24
+//     dependsOn stageLibrary
+//     dependsOn configureApache22
+//     dependsOn configureApache24
 
-    inputs.file "src/apache/apache.gyp"
-    outputs.file "${platBuildDir}/apache/Makefile"
+//     inputs.file "src/apache/apache.gyp"
+//     outputs.file "${platBuildDir}/apache/Makefile"
 
-    ext.apacheBuildEnvironment = [
-        ARCH_FLAG: gccArchFlag,
-        APACHE22_INCLUDE_DIR: "${platBuildDir}/httpd-${apache22Version}/include",
-        APACHE24_INCLUDE_DIR: "${platBuildDir}/httpd-${apache24Version}/include",
-        OTEL_SDK_LIB_DIR: "${libraryStageDir}/sdk_lib",
-        ANSDK_DIR: modDepDir,
-        COMPILER_FLAGS: (coverageEnabled) ? coverageCompilerFlags : '',
-        LINKER_FLAGS: (coverageEnabled) ? coverageLinkerFlags : '',
-        LIBRARY_FLAGS: libraryFlags,
-    ]
+//     ext.apacheBuildEnvironment = [
+//         ARCH_FLAG: gccArchFlag,
+//         APACHE22_INCLUDE_DIR: "${platBuildDir}/httpd-${apache22Version}/include",
+//         APACHE24_INCLUDE_DIR: "${platBuildDir}/httpd-${apache24Version}/include",
+//         OTEL_SDK_LIB_DIR: "${libraryStageDir}/sdk_lib",
+//         ANSDK_DIR: modDepDir,
+//         COMPILER_FLAGS: (coverageEnabled) ? coverageCompilerFlags : '',
+//         LINKER_FLAGS: (coverageEnabled) ? coverageLinkerFlags : '',
+//         LIBRARY_FLAGS: libraryFlags,
+//     ]
 
-    environment apacheBuildEnvironment
-    workingDir 'src/apache'
-    commandLine gypPath, "--generator-output=${platBuildDir}/apache", '--toplevel-dir=.', '--depth=./', '-f', gypType, 'apache.gyp'
-}
+//     environment apacheBuildEnvironment
+//     workingDir 'src/apache'
+//     commandLine gypPath, "--generator-output=${platBuildDir}/apache", '--toplevel-dir=.', '--depth=./', '-f', gypType, 'apache.gyp'
+// }
 
-task buildApacheModule(type: Exec) {
-    group = 'Apache Web Server Module'
-    description = 'Build the Apache Web Server Module'
+// task buildApacheModule(type: Exec) {
+//     group = 'Apache Web Server Module'
+//     description = 'Build the Apache Web Server Module'
 
-    dependsOn gypApacheModule
-    inputs.dir 'src/util'
-    inputs.dir 'src/apache'
-    inputs.dir 'src/core'
+//     dependsOn gypApacheModule
+//     inputs.dir 'src/util'
+//     inputs.dir 'src/apache'
+//     inputs.dir 'src/core'
 
-    outputs.file "${platBuildDir}/apache/out/Default/lib.target/libmod_apache_otel.so"
-    outputs.file "${platBuildDir}/apache/out/Default/lib.target/libmod_apache_otel22.so"
+//     outputs.file "${platBuildDir}/apache/out/Default/lib.target/libmod_apache_otel.so"
+//     outputs.file "${platBuildDir}/apache/out/Default/lib.target/libmod_apache_otel22.so"
 
-    args = ['make', 'V=1', '-j', Runtime.runtime.availableProcessors()]
+//     args = ['make', 'V=1', '-j', Runtime.runtime.availableProcessors()]
 
-    environment gypApacheModule.apacheBuildEnvironment
-    workingDir "${platBuildDir}/apache"
-    commandLine args
-}
+//     environment gypApacheModule.apacheBuildEnvironment
+//     workingDir "${platBuildDir}/apache"
+//     commandLine args
+// }
 
-task stageApacheModule(type: Copy) {
-    group = 'Apache Web Server Module'
-    description = 'Stage the Apache Web Server Module distribution directory'
+// task stageApacheModule(type: Copy) {
+//     group = 'Apache Web Server Module'
+//     description = 'Stage the Apache Web Server Module distribution directory'
 
-    dependsOn stageLibrary
+//     dependsOn stageLibrary
 
-    from buildApacheModule
-    into apacheStageDir
-}
+//     from buildApacheModule
+//     into apacheStageDir
+// }
 
-stageApacheModule.mustRunAfter assembleLibrary
+// stageApacheModule.mustRunAfter assembleLibrary
 
-task stripApacheModule(type: Exec) {
-    group = 'Apache Web Server Module'
-    description = 'Strip the production Apache Web Server Module'
+// task stripApacheModule(type: Exec) {
+//     group = 'Apache Web Server Module'
+//     description = 'Strip the production Apache Web Server Module'
 
-    dependsOn stageApacheModule
+//     dependsOn stageApacheModule
 
-    onlyIf { !debug }
+//     onlyIf { !debug }
 
-    inputs.dir stageApacheModule
-    outputs.dir "${apacheStageDir}/libopentelemetry_webserver_sdk.${sharedLibraryExt}"
+//     inputs.dir stageApacheModule
+//     outputs.dir "${apacheStageDir}/libopentelemetry_webserver_sdk.${sharedLibraryExt}"
 
-    workingDir apacheStageDir
-    commandLine 'strip', '-x', "libmod_apache_otel.${sharedLibraryExt}"
-    commandLine 'strip', '-x', "libmod_apache_otel22.${sharedLibraryExt}"
-}
+//     workingDir apacheStageDir
+//     commandLine 'strip', '-x', "libmod_apache_otel.${sharedLibraryExt}"
+//     commandLine 'strip', '-x', "libmod_apache_otel22.${sharedLibraryExt}"
+// }
 
-task assembleApacheModule(type: Tar) {
-    group = 'Apache Web Server Module'
-    description = 'Assemble the Apache Web Server module artifact (tgz)'
+// task assembleApacheModule(type: Tar) {
+//     group = 'Apache Web Server Module'
+//     description = 'Assemble the Apache Web Server module artifact (tgz)'
 
-    dependsOn stripApacheModule
+//     dependsOn stripApacheModule
 
-    from libraryStageDir
-    baseName "opentelemetry-webserver-sdk-${osArch}-${osName}"
-    into 'opentelemetry-webserver-sdk'
-    destinationDir file(buildDir)
-    compression Compression.GZIP
-}
+//     from libraryStageDir
+//     baseName "opentelemetry-webserver-sdk-${osArch}-${osName}"
+//     into 'opentelemetry-webserver-sdk'
+//     destinationDir file(buildDir)
+//     compression Compression.GZIP
+// }
 
 // NGINX
 nginxSupportedVersions.each { nginxVersion ->
@@ -473,7 +473,7 @@ task assembleWebServerModule(type: Tar) {
     group = 'Web Server Agent'
     description = 'Assemble the Web Server agent artifact (tgz)'
 
-    dependsOn stripApacheModule
+    // dependsOn stripApacheModule
     nginxSupportedVersions.each {
         nginxVersion ->
         dependsOn "stripNginxModule${nginxVersion}"
@@ -532,12 +532,12 @@ task runUnitTest(type: Exec) {
     commandLine './unit_test'
 }
 
-task runApacheServer(type: Exec) {
-    dependsOn assembleApacheModule
+// task runApacheServer(type: Exec) {
+//     dependsOn assembleApacheModule
 
-    workingDir 'test'
-    commandLine './ApacheTesting.sh', "${target_system}"
-}
+//     workingDir 'test'
+//     commandLine './ApacheTesting.sh', "${target_system}"
+// }
 
 // Code Coverage
 
@@ -545,7 +545,7 @@ task lcovCapture(type: Exec) {
   group = 'Code Coverage'
   description = 'capture coverage info'
 
-  dependsOn runApacheServer
+//   dependsOn runApacheServer
   dependsOn runUnitTest
 
   ext.tracefile = file(LCOV_RAW_INFO)
