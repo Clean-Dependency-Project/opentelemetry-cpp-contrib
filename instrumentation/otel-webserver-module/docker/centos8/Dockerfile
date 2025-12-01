@@ -86,23 +86,6 @@ RUN dnf install -y epel-release epel-next-release && \
         zlib zlib-devel openssl openssl-devel && \
     dnf clean all
 
-RUN mkdir -p dependencies/apache-log4cxx/${LOG4CXX_VERSION} \
-    && wget https://archive.apache.org/dist/logging/log4cxx/${LOG4CXX_VERSION}/apache-log4cxx-${LOG4CXX_VERSION}.tar.gz --no-check-certificate \
-    && tar -xf apache-log4cxx-${LOG4CXX_VERSION}.tar.gz \
-    && cd apache-log4cxx-${LOG4CXX_VERSION} \
-    && autoreconf -fi \
-    && libtoolize --copy --force || true \
-    && ./configure \
-         --prefix=/dependencies/apache-log4cxx/${LOG4CXX_VERSION}/ \
-         --enable-static=yes --enable-shared=no --with-pic \
-         --with-apr=/dependencies/apr/${APR_VERSION}/ \
-         --with-apr-util=/dependencies/apr-util/${APRUTIL_VERSION}/ \
-    && make -j$(nproc) \
-    && make install \
-    && cd .. \
-    && rm -rf apache-log4cxx-${LOG4CXX_VERSION}*
-
-
 # ------------------------------------------------------------------------
 # APR, expat, APR-util
 # ------------------------------------------------------------------------
@@ -132,6 +115,24 @@ RUN mkdir -p dependencies/apr-util/${APRUTIL_VERSION} \
         --with-expat=/dependencies/expat/${EXPAT_VERSION} \
     && make -j$(nproc) && make install \
     && cd .. && rm -rf apr-util-${APRUTIL_VERSION}*
+
+
+RUN mkdir -p dependencies/apache-log4cxx/${LOG4CXX_VERSION} \
+    && wget https://archive.apache.org/dist/logging/log4cxx/${LOG4CXX_VERSION}/apache-log4cxx-${LOG4CXX_VERSION}.tar.gz --no-check-certificate \
+    && tar -xf apache-log4cxx-${LOG4CXX_VERSION}.tar.gz \
+    && cd apache-log4cxx-${LOG4CXX_VERSION} \
+    && autoreconf -fi \
+    && libtoolize --copy --force || true \
+    && ./configure \
+         --prefix=/dependencies/apache-log4cxx/${LOG4CXX_VERSION}/ \
+         --enable-static=yes --enable-shared=no --with-pic \
+         --with-apr=/dependencies/apr/${APR_VERSION}/ \
+         --with-apr-util=/dependencies/apr-util/${APRUTIL_VERSION}/ \
+    && make -j$(nproc) \
+    && make install \
+    && cd .. \
+    && rm -rf apache-log4cxx-${LOG4CXX_VERSION}*
+
 
 # ------------------------------------------------------------------------
 # Build OpenTelemetry C++ SDK
