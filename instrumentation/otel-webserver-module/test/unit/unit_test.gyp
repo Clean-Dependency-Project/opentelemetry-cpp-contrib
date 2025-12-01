@@ -34,7 +34,7 @@
       ['OS=="linux"', {
 
         'cflags': [
-          '-Wall -pthread -std=c++11',
+          '-Wall -pthread -std=c++14',
         ],
 
         'libraries': [
