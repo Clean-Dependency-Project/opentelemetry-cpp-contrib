@@ -60,19 +60,31 @@ RUN wget https://archives.boost.io/release/${BOOST_VERSION}/source/${BOOST_FILEN
 # ------------------------------------------------------------------------
 # Build gRPC from source
 # ------------------------------------------------------------------------
-RUN git clone https://github.com/grpc/grpc \
-  && cd grpc \
-  && git checkout tags/v${GRPC_VERSION} -b v${GRPC_VERSION} \
-  && git submodule update --init \
-  && sed -i "s/target_link_libraries(bssl ssl crypto)/target_link_libraries(bssl ssl crypto rt)/g" third_party/boringssl-with-bazel/CMakeLists.txt \
-  && mkdir -p cmake/build \
-  && cd cmake/build \
-  && cmake ../.. -DgRPC_INSTALL=ON -DCMAKE_BUILD_TYPE=Release \
-        -DgRPC_ABSL_PROVIDER=module -DgRPC_CARES_PROVIDER=module \
-        -DgRPC_PROTOBUF_PROVIDER=module -DgRPC_RE2_PROVIDER=module \
-        -DgRPC_SSL_PROVIDER=module -DgRPC_ZLIB_PROVIDER=module \
-  && make -j$(nproc) && make install \
-  && cd ../../.. && rm -rf grpc
+# RUN git clone https://github.com/grpc/grpc \
+#   && cd grpc \
+#   && git checkout tags/v${GRPC_VERSION} -b v${GRPC_VERSION} \
+#   && git submodule update --init \
+#   && sed -i "s/target_link_libraries(bssl ssl crypto)/target_link_libraries(bssl ssl crypto rt)/g" third_party/boringssl-with-bazel/CMakeLists.txt \
+#   && mkdir -p cmake/build \
+#   && cd cmake/build \
+#   && cmake ../.. -DgRPC_INSTALL=ON -DCMAKE_BUILD_TYPE=Release \
+#         -DgRPC_ABSL_PROVIDER=module -DgRPC_CARES_PROVIDER=module \
+#         -DgRPC_PROTOBUF_PROVIDER=module -DgRPC_RE2_PROVIDER=module \
+#         -DgRPC_SSL_PROVIDER=module -DgRPC_ZLIB_PROVIDER=module \
+#   && make -j$(nproc) && make install \
+#   && cd ../../.. && rm -rf grpc
+
+RUN dnf install -y epel-release epel-next-release && \
+    dnf config-manager --set-enabled crb && \
+    dnf makecache && \
+    dnf install -y \
+        grpc grpc-devel \
+        protobuf protobuf-devel \
+        abseil-cpp abseil-cpp-devel \
+        re2 re2-devel \
+        c-ares c-ares-devel \
+        zlib zlib-devel openssl openssl-devel && \
+    dnf clean all
 
 # ------------------------------------------------------------------------
 # APR, expat, APR-util
@@ -122,6 +134,10 @@ RUN mkdir -p dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/lib \
         -DWITH_OTLP=ON \
         -DWITH_OTLP_GRPC=ON \
         -DWITH_OTLP_HTTP=ON \
+        -DCMAKE_PREFIX_PATH="/usr" \
+        -DProtobuf_INCLUDE_DIR=/usr/include \
+        -DgRPC_DIR=/usr/lib64/cmake/grpc \
+        -Dabsl_DIR=/usr/lib64/cmake/absl \
         -DCMAKE_INSTALL_PREFIX=/dependencies/opentelemetry/${OPENTELEMETRY_VERSION} \
     && cmake --build . --target all -j$(nproc) \
     && cmake --install . \
