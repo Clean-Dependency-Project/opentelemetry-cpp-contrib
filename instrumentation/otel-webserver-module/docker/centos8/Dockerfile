@@ -124,14 +124,17 @@ RUN mkdir -p dependencies/apache-log4cxx/${LOG4CXX_VERSION} \
     && autoreconf -fi \
     && libtoolize --copy --force || true \
     && ./configure \
-         --prefix=/dependencies/apache-log4cxx/${LOG4CXX_VERSION}/ \
-         --enable-static=yes --enable-shared=no --with-pic \
-         --with-apr=/dependencies/apr/${APR_VERSION}/ \
-         --with-apr-util=/dependencies/apr-util/${APRUTIL_VERSION}/ \
+         --prefix=/dependencies/apache-log4cxx/${LOG4CXX_VERSION} \
+         --enable-static=yes \
+         --enable-shared=no \
+         --with-pic \
+         --with-apr=/dependencies/apr/${APR_VERSION}/bin/apr-1-config \
+         --with-apr-util=/dependencies/apr-util/${APRUTIL_VERSION}/bin/apu-1-config \
     && make -j$(nproc) \
     && make install \
     && cd .. \
     && rm -rf apache-log4cxx-${LOG4CXX_VERSION}*
+
 
 
 # ------------------------------------------------------------------------
