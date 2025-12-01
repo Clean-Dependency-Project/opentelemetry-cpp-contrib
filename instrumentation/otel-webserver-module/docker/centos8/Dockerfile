@@ -6,9 +6,6 @@ FROM quay.io/centos/centos:stream9
 ARG BUILD_NUMBER
 LABEL NAME="apm/build-image-nginx-otel-centos9-x64" VERSION=$BUILD_NUMBER
 
-# ------------------------------------------------------------------------
-# Environment
-# ------------------------------------------------------------------------
 ENV LANG=C.UTF-8
 ENV PATH="/opt/rh/gcc-toolset-13/root/usr/bin:${PATH}"
 
@@ -36,22 +33,21 @@ RUN dnf -y update && \
     dnf clean all
 
 # ------------------------------------------------------------------------
-# Build Python 2.7 for GYP
+# Build Python 2.7 (for GYP)
 # ------------------------------------------------------------------------
 RUN wget http://www.python.org/ftp/python/${PYTHON_VERSION}/Python-${PYTHON_VERSION}.tar.xz \
     && unxz Python-${PYTHON_VERSION}.tar.xz \
     && tar -xf Python-${PYTHON_VERSION}.tar \
-    && cd Python-${PYTHON_VERSION} \
-    && ./configure --prefix=/usr/local && make && make install \
-    && cd .. && rm -rf Python-${PYTHON_VERSION}.tar*
+    && cd Python-${PYTHON_VERSION} && ./configure --prefix=/usr/local && make && make install \
+    && cd .. && rm -rf Python-${PYTHON_VERSION}.tar Python-${PYTHON_VERSION}.tar.xz
 
 # ------------------------------------------------------------------------
-# Directory setup
+# Directory prep
 # ------------------------------------------------------------------------
-RUN mkdir -p /dependencies /build-dependencies
+RUN mkdir -p dependencies
 
 # ------------------------------------------------------------------------
-# Build Boost
+# Install Boost
 # ------------------------------------------------------------------------
 RUN wget https://archives.boost.io/release/${BOOST_VERSION}/source/${BOOST_FILENAME}.tar.gz && \
     tar -xvf ${BOOST_FILENAME}.tar.gz && \
@@ -72,15 +68,14 @@ RUN git clone https://github.com/grpc/grpc \
   && mkdir -p cmake/build \
   && cd cmake/build \
   && cmake ../.. -DgRPC_INSTALL=ON -DCMAKE_BUILD_TYPE=Release \
-                 -DgRPC_ABSL_PROVIDER=module -DgRPC_CARES_PROVIDER=module \
-                 -DgRPC_PROTOBUF_PROVIDER=module -DgRPC_RE2_PROVIDER=module \
-                 -DgRPC_SSL_PROVIDER=module -DgRPC_ZLIB_PROVIDER=module \
-  && make -j$(nproc) \
-  && make install \
+        -DgRPC_ABSL_PROVIDER=module -DgRPC_CARES_PROVIDER=module \
+        -DgRPC_PROTOBUF_PROVIDER=module -DgRPC_RE2_PROVIDER=module \
+        -DgRPC_SSL_PROVIDER=module -DgRPC_ZLIB_PROVIDER=module \
+  && make -j$(nproc) && make install \
   && cd ../../.. && rm -rf grpc
 
 # ------------------------------------------------------------------------
-# Build APR
+# APR, expat, APR-util
 # ------------------------------------------------------------------------
 RUN mkdir -p dependencies/apr/${APR_VERSION} \
     && wget https://archive.apache.org/dist/apr/apr-${APR_VERSION}.tar.gz --no-check-certificate \
@@ -90,26 +85,19 @@ RUN mkdir -p dependencies/apr/${APR_VERSION} \
     && make -j$(nproc) && make install \
     && cd .. && rm -rf apr-${APR_VERSION}*
 
-# ------------------------------------------------------------------------
-# Build Expat
-# ------------------------------------------------------------------------
 RUN mkdir -p dependencies/expat/${EXPAT_VERSION} \
-    && wget https://github.com/libexpat/libexpat/releases/download/${EXPAT_RVERSION}/expat-${EXPAT_VERSION}.tar.gz \
+    && wget https://github.com/libexpat/libexpat/releases/download/${EXPAT_RVERSION}/expat-${EXPAT_VERSION}.tar.gz --no-check-certificate \
     && tar -xf expat-${EXPAT_VERSION}.tar.gz \
     && cd expat-${EXPAT_VERSION} \
     && ./configure --prefix=/dependencies/expat/${EXPAT_VERSION} --enable-static=yes --enable-shared=no --with-pic \
     && make -j$(nproc) && make install \
     && cd .. && rm -rf expat-${EXPAT_VERSION}*
 
-# ------------------------------------------------------------------------
-# Build APR-UTIL
-# ------------------------------------------------------------------------
 RUN mkdir -p dependencies/apr-util/${APRUTIL_VERSION} \
-    && wget https://archive.apache.org/dist/apr/apr-util-${APRUTIL_VERSION}.tar.gz \
+    && wget https://archive.apache.org/dist/apr/apr-util-${APRUTIL_VERSION}.tar.gz --no-check-certificate \
     && tar -xf apr-util-${APRUTIL_VERSION}.tar.gz \
     && cd apr-util-${APRUTIL_VERSION} \
-    && ./configure \
-        --prefix=/dependencies/apr-util/${APRUTIL_VERSION} \
+    && ./configure --prefix=/dependencies/apr-util/${APRUTIL_VERSION} \
         --enable-static=yes --enable-shared=no --with-pic \
         --with-apr=/dependencies/apr/${APR_VERSION} \
         --with-expat=/dependencies/expat/${EXPAT_VERSION} \
@@ -119,13 +107,14 @@ RUN mkdir -p dependencies/apr-util/${APRUTIL_VERSION} \
 # ------------------------------------------------------------------------
 # Build OpenTelemetry C++ SDK
 # ------------------------------------------------------------------------
-RUN mkdir -p /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/lib \
+RUN mkdir -p dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/lib \
     && mkdir -p /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/include \
-    && git clone https://github.com/open-telemetry/opentelemetry-cpp.git \
-    && cd opentelemetry-cpp \
+    && git clone https://github.com/open-telemetry/opentelemetry-cpp \
+    && cd opentelemetry-cpp/ \
     && git checkout tags/v${OPENTELEMETRY_VERSION} -b v${OPENTELEMETRY_VERSION} \
     && git submodule update --init --recursive \
-    && mkdir build && cd build \
+    && mkdir build
+    && cd build \
     && cmake .. \
         -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
         -DBUILD_TESTING=OFF \
@@ -134,54 +123,47 @@ RUN mkdir -p /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/lib \
         -DWITH_OTLP_GRPC=ON \
         -DWITH_OTLP_HTTP=ON \
         -DCMAKE_INSTALL_PREFIX=/dependencies/opentelemetry/${OPENTELEMETRY_VERSION} \
-    && cmake --build . -j$(nproc) \
+    && cmake --build . --target all -j$(nproc) \
     && cmake --install . \
     && cd .. \
-    && cp -r api/include/opentelemetry /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/include/ \
-    && cp -r sdk/include/opentelemetry /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/include/ \
-    && cp -r exporters/include/opentelemetry /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/include/ \
-    && cp -r ext/include/opentelemetry /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/include/ || true \
-    && find . -name "*.so" -exec cp {} /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/lib/ \; \
-    && cd / && rm -rf opentelemetry-cpp
+    && find . -name "*.so" -type f -exec cp {} /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/lib/ \; \
+    && cp -r build/* /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/lib \
+    && cp -r api/include/ /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/ \
+    && for dir in exporters/*; do if [ -d "$dir" ]; then cp -rf "$dir/include" /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/; fi; done \
+    && cp -r sdk/include/ /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/ \
+    && cp -r ext/include/ /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/ || true \
+    && cp -r build/generated/third_party/opentelemetry-proto/opentelemetry/proto/ /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/include/opentelemetry/ \
+    && cd .. && rm -rf opentelemetry-cpp
 
 # ------------------------------------------------------------------------
-# Download Nginx sources
+# Download Nginx source (needed by build)
 # ------------------------------------------------------------------------
-RUN wget http://nginx.org/download/nginx-${NGINX_VERSION}.tar.gz \
-    && tar -xvf nginx-${NGINX_VERSION}.tar.gz -C /build-dependencies \
-    && rm -f nginx-${NGINX_VERSION}.tar.gz
+RUN wget http://nginx.org/download/nginx-${NGINX_VERSION}.tar.gz && \
+    tar -xvf nginx-${NGINX_VERSION}.tar.gz -C /build-dependencies && \
+    rm -f nginx-${NGINX_VERSION}.tar.gz
 
 # ------------------------------------------------------------------------
-# Build Log4cxx
+# Build log4cxx
 # ------------------------------------------------------------------------
 RUN mkdir -p dependencies/apache-log4cxx/${LOG4CXX_VERSION} \
-    && wget https://archive.apache.org/dist/logging/log4cxx/${LOG4CXX_VERSION}/apache-log4cxx-${LOG4CXX_VERSION}.tar.gz \
+    && wget https://archive.apache.org/dist/logging/log4cxx/${LOG4CXX_VERSION}/apache-log4cxx-${LOG4CXX_VERSION}.tar.gz --no-check-certificate \
     && tar -xf apache-log4cxx-${LOG4CXX_VERSION}.tar.gz \
     && cd apache-log4cxx-${LOG4CXX_VERSION} \
-    && autoreconf -fi \
-    && ./configure --prefix=/dependencies/apache-log4cxx/${LOG4CXX_VERSION} \
-                   --enable-static=yes --enable-shared=no --with-pic \
-                   --with-apr=/dependencies/apr/${APR_VERSION} \
-                   --with-apr-util=/dependencies/apr-util/${APRUTIL_VERSION} \
+    && ./configure --prefix=/dependencies/apache-log4cxx/${LOG4CXX_VERSION}/ \
+        --enable-static=yes --enable-shared=no --with-pic \
+        --with-apr=/dependencies/apr/${APR_VERSION}/ \
+        --with-apr-util=/dependencies/apr-util/${APRUTIL_VERSION}/ \
     && make -j$(nproc) && make install \
     && cd .. && rm -rf apache-log4cxx-${LOG4CXX_VERSION}*
 
 # ------------------------------------------------------------------------
-# Build OTel module with Gradle
+# COPY CODE + CRITICAL FIX
 # ------------------------------------------------------------------------
 COPY . /otel-webserver-module
-
-RUN cp -r /dependencies /otel-webserver-module/ && \
-    cp -r /build-dependencies /otel-webserver-module/ && \
-    \
-    # >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-    # CRITICAL FIX — PUT OTel exactly where GYP expects it
-    # >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-    mkdir -p /otel-webserver-module/build/linux-x64/module-dependencies/opentelemetry && \
-    cp -r /dependencies/opentelemetry/${OPENTELEMETRY_VERSION} \
-          /otel-webserver-module/build/linux-x64/module-dependencies/opentelemetry/ && \
-    \
-    cd /otel-webserver-module && ./gradlew assembleWebServerModule
+RUN cp -r /dependencies /otel-webserver-module/ \
+    && cp -r /build-dependencies /otel-webserver-module/ \
+    && cd otel-webserver-module \
+    && ./gradlew assembleWebServerModule 
 
 # ------------------------------------------------------------------------
 # Install Nginx binary
@@ -198,7 +180,7 @@ RUN echo "[nginx]" > /etc/yum.repos.d/nginx.repo && \
     dnf clean all
 
 # ------------------------------------------------------------------------
-# Configure Nginx with OTel module
+# Configure Nginx to load module
 # ------------------------------------------------------------------------
 RUN cd /otel-webserver-module/build && \
     tar -xf opentelemetry-webserver-sdk-x64-linux.tgz && \
