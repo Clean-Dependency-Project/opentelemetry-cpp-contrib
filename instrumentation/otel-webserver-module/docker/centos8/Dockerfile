@@ -115,11 +115,13 @@ ARG OPENTELEMETRY_VERSION="1.23.0"
 
 RUN mkdir -p /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/lib \
     && mkdir -p /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/include \
+    && echo ">>> Cloning opentelemetry-cpp" \
     && git clone https://github.com/open-telemetry/opentelemetry-cpp.git \
     && cd opentelemetry-cpp \
     && git checkout tags/v${OPENTELEMETRY_VERSION} -b v${OPENTELEMETRY_VERSION} \
     && git submodule update --init --recursive \
     && mkdir build && cd build \
+    && echo ">>> Running CMake build" \
     && cmake .. \
         -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
         -DBUILD_TESTING=OFF \
@@ -130,29 +132,73 @@ RUN mkdir -p /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/lib \
         -DCMAKE_INSTALL_PREFIX=/dependencies/opentelemetry/${OPENTELEMETRY_VERSION} \
     && cmake --build . --target all -j$(nproc) \
     && cmake --install . \
-    && cd ../ \
     \
-    # ------------------------------
-    # FIXED INCLUDE PATH COPIES
-    # ------------------------------
+    && cd .. \
+    && echo "===============================================" \
+    && echo ">>> COPYING API HEADERS" \
+    && echo "===============================================" \
+    && ls -R api/include/opentelemetry || true \
     && cp -r api/include/opentelemetry \
-           /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/include/ \
+        /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/include/ \
+    && ls -R /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/include/opentelemetry || true \
+    \
+    && echo "===============================================" \
+    && echo ">>> COPYING SDK HEADERS" \
+    && echo "===============================================" \
+    && ls -R sdk/include/opentelemetry || true \
     && cp -r sdk/include/opentelemetry \
-           /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/include/ \
+        /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/include/ \
+    && ls -R /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/include/opentelemetry/sdk || true \
+    \
+    && echo "===============================================" \
+    && echo ">>> COPYING EXPORTERS HEADERS" \
+    && echo "===============================================" \
+    && ls -R exporters/include/opentelemetry || true \
     && cp -r exporters/include/opentelemetry \
-           /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/include/ \
+        /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/include/ \
+    && ls -R /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/include/opentelemetry/exporters || true \
+    \
+    && echo "===============================================" \
+    && echo ">>> COPYING EXT HEADERS" \
+    && echo "===============================================" \
+    && ls -R ext/include/opentelemetry || true \
     && cp -r ext/include/opentelemetry \
-           /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/include/ || true \
+        /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/include/ || true \
+    && ls -R /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/include/opentelemetry/ext || true \
     \
-    # proto includes (optional)
-    && cp -r build/generated/third_party/opentelemetry-proto/opentelemetry \
-           /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/include/ || true \
+    && echo "===============================================" \
+    && echo ">>> COPYING PROTO HEADERS IF PRESENT" \
+    && echo "===============================================" \
+    && if [ -d build/generated/third_party/opentelemetry-proto/opentelemetry ]; then \
+         ls -R build/generated/third_party/opentelemetry-proto/opentelemetry ; \
+         cp -r build/generated/third_party/opentelemetry-proto/opentelemetry \
+            /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/include/ ; \
+       fi \
     \
-    # .so libs
+    && echo "===============================================" \
+    && echo ">>> COPYING .SO LIBRARIES" \
+    && echo "===============================================" \
     && find . -name "*.so" -type f -exec cp {} \
          /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/lib/ \; \
+    && ls -l /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/lib \
     \
-    && cd .. && rm -rf opentelemetry-cpp
+    && echo "===============================================" \
+    && echo ">>> FINAL INCLUDE TREE (FULL DUMP)" \
+    && echo "===============================================" \
+    && ls -R /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/include \
+    \
+    && echo "===============================================" \
+    && echo ">>> SANITY CHECK: attribute_value.h" \
+    && echo "===============================================" \
+    && if [ ! -f /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/include/opentelemetry/common/attribute_value.h ]; then \
+         echo "FATAL: attribute_value.h missing!" >&2 ; \
+         exit 1 ; \
+       else \
+         echo "SUCCESS: attribute_value.h FOUND" ; \
+       fi \
+    \
+    && cd / && rm -rf opentelemetry-cpp
+
 
 
 # ------------------------------------------------------------------------
