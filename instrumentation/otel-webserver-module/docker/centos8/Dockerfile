@@ -113,7 +113,7 @@ RUN mkdir -p dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/lib \
     && cd opentelemetry-cpp/ \
     && git checkout tags/v${OPENTELEMETRY_VERSION} -b v${OPENTELEMETRY_VERSION} \
     && git submodule update --init --recursive \
-    && mkdir build
+    && mkdir build \
     && cd build \
     && cmake .. \
         -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
