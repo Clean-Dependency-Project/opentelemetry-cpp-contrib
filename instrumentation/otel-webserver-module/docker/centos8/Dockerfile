@@ -32,10 +32,6 @@ RUN dnf -y update && \
         perl m4 autoconf automake libtool && \
     dnf clean all
 
-RUN echo "source /opt/rh/gcc-toolset-13/enable" >> /etc/profile \
-    && source /opt/rh/gcc-toolset-13/enable
-
-
 # ------------------------------------------------------------------------
 # Build Python 2.7 (for GYP)
 # ------------------------------------------------------------------------
@@ -131,8 +127,6 @@ RUN mkdir -p dependencies/apache-log4cxx/${LOG4CXX_VERSION} \
     && automake --add-missing \
     && make install \
     && cd .. && rm -rf apache-log4cxx-${LOG4CXX_VERSION}.tar.gz && rm -rf apache-log4cxx-${LOG4CXX_VERSION}
-
-
 
 # ------------------------------------------------------------------------
 # Build OpenTelemetry C++ SDK
