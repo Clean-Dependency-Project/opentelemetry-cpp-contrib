@@ -117,16 +117,31 @@ RUN mkdir -p dependencies/apr-util/${APRUTIL_VERSION} \
     && cd .. && rm -rf apr-util-${APRUTIL_VERSION}*
 
 
-#install log4cxx
+# ------------------------------------------------------------------------
+# Build Apache log4cxx (0.11.0) - Fully Fixed
+# ------------------------------------------------------------------------
+RUN dnf install -y libxml2-devel libiconv-devel syslog-ng || true
+
 RUN mkdir -p dependencies/apache-log4cxx/${LOG4CXX_VERSION} \
     && wget https://archive.apache.org/dist/logging/log4cxx/${LOG4CXX_VERSION}/apache-log4cxx-${LOG4CXX_VERSION}.tar.gz --no-check-certificate \
     && tar -xf apache-log4cxx-${LOG4CXX_VERSION}.tar.gz \
     && cd apache-log4cxx-${LOG4CXX_VERSION} \
-    && ./configure --prefix=/dependencies/apache-log4cxx/${LOG4CXX_VERSION}/ --enable-static=yes --enable-shared=no --with-pic --with-apr=/dependencies/apr/${APR_VERSION}/ --with-apr-util=/dependencies/apr-util/${APRUTIL_VERSION}/ && echo $? \
-    && make -j 6 ; echo 0 \
-    && automake --add-missing \
+    && autoreconf -fi \
+    && libtoolize --copy --force || true \
+    && ./configure \
+         --prefix=/dependencies/apache-log4cxx/${LOG4CXX_VERSION} \
+         --enable-static=yes \
+         --enable-shared=no \
+         --with-pic \
+         --disable-doxygen \
+         --disable-wchar_t \
+         --with-apr=/dependencies/apr/${APR_VERSION}/bin/apr-1-config \
+         --with-apr-util=/dependencies/apr-util/${APRUTIL_VERSION}/bin/apu-1-config \
+    && make -j$(nproc) \
     && make install \
-    && cd .. && rm -rf apache-log4cxx-${LOG4CXX_VERSION}.tar.gz && rm -rf apache-log4cxx-${LOG4CXX_VERSION}
+    && cd .. \
+    && rm -rf apache-log4cxx-${LOG4CXX_VERSION}*
+
 
 
 
