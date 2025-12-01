@@ -32,6 +32,10 @@ RUN dnf -y update && \
         perl m4 autoconf automake libtool && \
     dnf clean all
 
+RUN echo "source /opt/rh/gcc-toolset-13/enable" >> /etc/profile \
+    && source /opt/rh/gcc-toolset-13/enable
+
+
 # ------------------------------------------------------------------------
 # Build Python 2.7 (for GYP)
 # ------------------------------------------------------------------------
