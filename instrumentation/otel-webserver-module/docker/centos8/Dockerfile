@@ -29,23 +29,17 @@ ARG PYTHON_VERSION="2.7.8"
 # ------------------------------------------------------------------------
 # System dependencies
 # ------------------------------------------------------------------------
-# install required packages
-RUN yum update -y \
-    && yum install -y \
-    yum  wget -y \
-    yum  -y zlib-devel \
-    yum  -y openssl-devel \
-    yum  java-1.8.0-openjdk -y \
-    yum  java-1.8.0-openjdk-devel \
-    yum  pcre-devel -y \
-    yum  xz -y \
-    yum  httpd -y \
-    && yum clean all
+RUN apt-get update && apt-get install -y \
+    wget \
+    zlib1g-dev \
+    libssl-dev \
+    openjdk-17-jdk \
+    libpcre3-dev \
+    xz-utils \
+    apache2 \
+    lcov \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# install lcov package
-RUN yum install -y epel-release && \
-    yum install -y lcov && \
-    yum clean all
 
 
 # ------------------------------------------------------------------------
