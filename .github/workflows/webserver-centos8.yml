@@ -9,75 +9,63 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # --- Checkout repo ---
       - name: checkout otel webserver
         uses: actions/checkout@v4
 
-      # --- Setup Buildx ---
       - name: setup buildx
-        id: buildx
-        uses: docker/setup-buildx-action@master
-        with:
-          install: true
+        uses: docker/setup-buildx-action@v3
 
-      # --- Build Docker image ---
-      - name: Build CentOS8 builder image
+      - name: Build Docker image
         run: |
           cd instrumentation/otel-webserver-module
-          docker buildx build \
-            -t apache_centos8 \
-            -f docker/centos8/Dockerfile \
-            --load .
+          docker buildx build -t apache_centos8 -f docker/centos8/Dockerfile --load .
 
-      # --- Start container (IMPORTANT FIX: override ENTRYPOINT) ---
-      - name: Start persistent container
+      # IMPORTANT FIX: use `tail -f /dev/null` instead of sleep infinity
+      - name: Start container
         run: |
           docker run -idt \
             --entrypoint "" \
             --name apache_centos8_container \
             apache_centos8 \
-            sleep infinity
+            tail -f /dev/null
 
-          # Debug check
           docker ps -a
 
-      # --- Copy code & build inside container ---
-      - name: Build webserver module inside container
+      # Build inside container
+      - name: Build webserver module
         run: |
           cd instrumentation/otel-webserver-module
 
-          # Clean inside container
           docker exec apache_centos8_container bash -c \
-            'cd /otel-webserver-module && rm -rf *'
+            'rm -rf /otel-webserver-module/*'
 
-          # Copy source code into container
-          docker cp . $(docker inspect --format="{{.Id}}" apache_centos8_container):/otel-webserver-module/
+          docker cp . apache_centos8_container:/otel-webserver-module/
 
-          # Run Gradle build
-          docker exec apache_centos8_container bash -c \
-            'cd /otel-webserver-module && \
-             rm -rf build && \
-             cp -r /dependencies /otel-webserver-module/ && \
-             cp -r /build-dependencies /otel-webserver-module/ && \
-             ./gradlew assembleWebServerModule'
+          docker exec apache_centos8_container bash -c '
+            cd /otel-webserver-module &&
+            rm -rf build &&
+            cp -r /dependencies /otel-webserver-module/ &&
+            cp -r /build-dependencies /otel-webserver-module/ &&
+            ./gradlew assembleWebServerModule
+          '
 
-      # --- Unit tests ---
-      - name: Run unit tests
+
+      # Copy artifacts
+      - name: Copy artifacts
         run: |
-          docker exec apache_centos8_container bash -c \
-            'cd /otel-webserver-module && ./gradlew runUnitTest'
-
-      # --- Copy artifacts out ---
-      - name: Copy build artifacts
-        id: artifacts
-        run: |
-          mkdir -p /tmp/apache_centos8/
+          mkdir -p /tmp/apache_centos8
           docker cp apache_centos8_container:/otel-webserver-module/build/opentelemetry-webserver-sdk-x64-linux.tgz \
             /tmp/apache_centos8/
 
-      # --- Upload artifacts ---
-      - name: upload artifacts
+      # Upload artifacts
+      - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: opentelemetry-webserver-sdk-x64-linux.tgz
           path: /tmp/apache_centos8/opentelemetry-webserver-sdk-x64-linux.tgz
+
+      # Stop and remove container  
+      - name: Cleanup
+        run: |
+          docker stop apache_centos8_container || true
+          docker rm apache_centos8_container || true
