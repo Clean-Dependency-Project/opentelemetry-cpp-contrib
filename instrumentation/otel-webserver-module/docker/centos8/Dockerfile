@@ -25,15 +25,24 @@ ARG PYTHON_VERSION="2.7.8"
 # ------------------------------------------------------------------------
 # System dependencies
 # ------------------------------------------------------------------------
-RUN apt-get update && apt-get install -y \
-    build-essential gcc g++ make cmake git wget curl xz-utils unzip \
-    zlib1g-dev libssl-dev libpcre3-dev bzip2 libbz2-dev \
-    autoconf automake libtool pkg-config m4 perl \
-    openjdk-17-jdk \
-    libprotobuf-dev protobuf-compiler \
-    libgrpc++-dev libgrpc-dev \
-    libabsl-dev libc-ares-dev libzstd-dev libre2-dev \
-    && apt-get clean && rm -rf /var/lib/apt/lists/*
+# install required packages
+RUN yum update -y \
+    && yum install -y \
+    yum  wget -y \
+    yum  -y zlib-devel \
+    yum  -y openssl-devel \
+    yum  java-1.8.0-openjdk -y \
+    yum  java-1.8.0-openjdk-devel \
+    yum  pcre-devel -y \
+    yum  xz -y \
+    yum  httpd -y \
+    && yum clean all
+
+# install lcov package
+RUN yum install -y epel-release && \
+    yum install -y lcov && \
+    yum clean all
+
 
 # ------------------------------------------------------------------------
 # Python 2.7.8
@@ -43,6 +52,17 @@ RUN wget http://www.python.org/ftp/python/${PYTHON_VERSION}/Python-${PYTHON_VERS
     && cd Python-${PYTHON_VERSION} \
     && ./configure --prefix=/usr/local && make -j$(nproc) && make install \
     && cd .. && rm -rf Python-${PYTHON_VERSION}*
+
+ARG CMAKE_VERSION="3.29.3"
+
+RUN wget https://cmake.org/files/v${CMAKE_VERSION%.*}/cmake-${CMAKE_VERSION}-linux-x86_64.tar.gz \
+    && tar -xvf cmake-${CMAKE_VERSION}-linux-x86_64.tar.gz \
+    && cd cmake-${CMAKE_VERSION}-linux-x86_64 \
+    && cp -rf * /usr/local/ \
+    && cd .. \
+    && rm -rf cmake-${CMAKE_VERSION}-linux-x86_64* \
+    && cmake --version
+
 
 RUN git clone https://github.com/grpc/grpc \
   && cd grpc \
@@ -119,13 +139,69 @@ RUN mkdir -p dependencies/apr-util/${APRUTIL_VERSION} \
     && cd .. && rm -rf apr-util-${APRUTIL_VERSION}*
 
 # ------------------------------------------------------------------------
-# libtool
+# install m4 + Perl deps
+# ------------------------------------------------------------------------
+RUN apt-get update && apt-get install -y \
+    m4 \
+    perl \
+    libdata-dumper-simple-perl \
+    libthread-queue-perl \
+    build-essential \
+    wget \
+    && apt-get clean
+
+# ------------------------------------------------------------------------
+# Build Perl from source (equivalent to your yum version)
+# ------------------------------------------------------------------------
+RUN wget http://www.cpan.org/src/${PERL_CPANVERSION}/perl-${PERL_VERSION}.tar.gz \
+    && tar -xzf perl-${PERL_VERSION}.tar.gz \
+    && cd perl-${PERL_VERSION} \
+    && ./Configure -des -Dprefix=/usr/local/perl-${PERL_VERSION} \
+    && make -j$(nproc) \
+    && make test || true \
+    && make install \
+    && cd .. \
+    && rm -rf perl-${PERL_VERSION}* 
+
+ENV PATH="/usr/local/perl-${PERL_VERSION}/bin:${PATH}"
+
+# ------------------------------------------------------------------------
+# install autoconf
+# ------------------------------------------------------------------------
+RUN wget https://ftp.gnu.org/gnu/autoconf/autoconf-${AUTOCONF_VERSION}.tar.gz \
+    && tar xzf autoconf-${AUTOCONF_VERSION}.tar.gz \
+    && cd autoconf-${AUTOCONF_VERSION} \
+    && ./configure --prefix=/usr \
+    && make -j$(nproc) && make install \
+    && autoconf --version \
+    && cd .. \
+    && rm -rf autoconf-${AUTOCONF_VERSION}*
+
+# ------------------------------------------------------------------------
+# install automake
+# Debian does NOT use --libdir=/usr/lib64. Use /usr/lib.
+# ------------------------------------------------------------------------
+RUN wget https://ftp.gnu.org/gnu/automake/automake-${AUTOMAKE_VERSION}.tar.gz \
+    && tar xzf automake-${AUTOMAKE_VERSION}.tar.gz \
+    && cd automake-${AUTOMAKE_VERSION} \
+    && ./configure --prefix=/usr --libdir=/usr/lib \
+    && make -j$(nproc) && make install \
+    && automake --version \
+    && cd .. \
+    && rm -rf automake-${AUTOMAKE_VERSION}*
+
+# ------------------------------------------------------------------------
+# install libtool
 # ------------------------------------------------------------------------
 RUN wget https://ftpmirror.gnu.org/libtool/libtool-${LIBTOOL_VERSION}.tar.gz \
-    && tar -xzf libtool-${LIBTOOL_VERSION}.tar.gz \
+    && tar xzf libtool-${LIBTOOL_VERSION}.tar.gz \
     && cd libtool-${LIBTOOL_VERSION} \
-    && ./configure --prefix=/usr && make -j$(nproc) && make install \
-    && cd .. && rm -rf libtool-${LIBTOOL_VERSION}*
+    && ./configure --prefix=/usr \
+    && make -j$(nproc) && make install \
+    && libtool --version \
+    && cd .. \
+    && rm -rf libtool-${LIBTOOL_VERSION}*
+
 
 # ------------------------------------------------------------------------
 # log4cxx (Debian fix)
