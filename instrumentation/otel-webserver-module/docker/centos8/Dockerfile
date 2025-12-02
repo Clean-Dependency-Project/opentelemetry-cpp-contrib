@@ -30,16 +30,17 @@ ARG PYTHON_VERSION="2.7.8"
 # System dependencies
 # ------------------------------------------------------------------------
 RUN apt-get update && apt-get install -y \
+    build-essential \
     wget \
+    xz-utils \
     zlib1g-dev \
     libssl-dev \
-    openjdk-17-jdk \
-    libpcre3-dev \
-    xz-utils \
-    apache2 \
-    lcov \
+    libbz2-dev \
+    libreadline-dev \
+    libsqlite3-dev \
+    libffi-dev \
+    curl \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
-
 
 
 # ------------------------------------------------------------------------
