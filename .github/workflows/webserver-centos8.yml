@@ -1,4 +1,4 @@
-name: webserver debian build
+name: webserver centos8
 
 on:
   workflow_dispatch:
@@ -9,33 +9,19 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # --------------------------------------------------------
-      # Checkout GitHub Repo
-      # --------------------------------------------------------
-      - name: Checkout repo
+      - name: checkout otel webserver
         uses: actions/checkout@v4
 
-      # --------------------------------------------------------
-      # Setup Docker Buildx
-      # --------------------------------------------------------
-      - name: Setup Docker Buildx
+      - name: setup buildx
         uses: docker/setup-buildx-action@v3
 
-      # --------------------------------------------------------
-      # Build CentOS 8 Docker Image
-      # --------------------------------------------------------
       - name: Build Docker image
         run: |
           cd instrumentation/otel-webserver-module
-          docker buildx build \
-            -t apache_centos8 \
-            -f docker/centos8/Dockerfile \
-            --load .
+          docker buildx build -t apache_centos8 -f docker/centos8/Dockerfile --load .
 
-      # --------------------------------------------------------
-      # Start container & keep it alive
-      # --------------------------------------------------------
-      - name: Start persistent container
+      # IMPORTANT FIX: use `tail -f /dev/null` instead of sleep infinity
+      - name: Start container
         run: |
           docker run -idt \
             --entrypoint "" \
@@ -43,24 +29,18 @@ jobs:
             apache_centos8 \
             tail -f /dev/null
 
-          echo "Container started:"
           docker ps -a
 
-      # --------------------------------------------------------
       # Build inside container
-      # --------------------------------------------------------
-      - name: Build module inside container
+      - name: Build webserver module
         run: |
           cd instrumentation/otel-webserver-module
 
-          # clean folder inside container
           docker exec apache_centos8_container bash -c \
             'rm -rf /otel-webserver-module/*'
 
-          # copy latest repo code into container
           docker cp . apache_centos8_container:/otel-webserver-module/
 
-          # run Gradle build inside CentOS 8 image
           docker exec apache_centos8_container bash -c '
             cd /otel-webserver-module &&
             rm -rf build &&
@@ -69,27 +49,22 @@ jobs:
             ./gradlew assembleWebServerModule
           '
 
-      # --------------------------------------------------------
-      # Copy output .tgz artifact
-      # --------------------------------------------------------
+
+      # Copy artifacts
       - name: Copy artifacts
         run: |
           mkdir -p /tmp/apache_centos8
           docker cp apache_centos8_container:/otel-webserver-module/build/opentelemetry-webserver-sdk-x64-linux.tgz \
             /tmp/apache_centos8/
 
-      # --------------------------------------------------------
-      # Upload artifact
-      # --------------------------------------------------------
-      - name: Upload build artifact
+      # Upload artifacts
+      - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: opentelemetry-webserver-sdk-x64-linux.tgz
           path: /tmp/apache_centos8/opentelemetry-webserver-sdk-x64-linux.tgz
 
-      # --------------------------------------------------------
-      # Cleanup after workflow
-      # --------------------------------------------------------
+      # Stop and remove container  
       - name: Cleanup
         run: |
           docker stop apache_centos8_container || true
