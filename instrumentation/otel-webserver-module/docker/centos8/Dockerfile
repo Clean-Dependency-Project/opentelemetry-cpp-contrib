@@ -124,18 +124,31 @@ RUN wget https://ftpmirror.gnu.org/libtool/libtool-${LIBTOOL_VERSION}.tar.gz \
 
 
 # ------------------------------------------------------------------------
-# Build log4cxx
+# Build log4cxx (Debian fix: autoreconf + automake --add-missing)
 # ------------------------------------------------------------------------
 RUN mkdir -p /dependencies/apache-log4cxx/${LOG4CXX_VERSION} \
     && wget https://archive.apache.org/dist/logging/log4cxx/${LOG4CXX_VERSION}/apache-log4cxx-${LOG4CXX_VERSION}.tar.gz \
     && tar -xzf apache-log4cxx-${LOG4CXX_VERSION}.tar.gz \
     && cd apache-log4cxx-${LOG4CXX_VERSION} \
-    && ./configure --prefix=/dependencies/apache-log4cxx/${LOG4CXX_VERSION} \
-        --enable-static=yes --enable-shared=no --with-pic \
+    \
+    # FIX: regenerate missing autotools files
+    && autoreconf -fi \
+    && automake --add-missing --copy --force-missing \
+    \
+    && ./configure \
+        --prefix=/dependencies/apache-log4cxx/${LOG4CXX_VERSION} \
+        --enable-static=yes \
+        --enable-shared=no \
+        --with-pic \
         --with-apr=/dependencies/apr/${APR_VERSION} \
         --with-apr-util=/dependencies/apr-util/${APRUTIL_VERSION} \
-    && make -j$(nproc) && make install \
-    && cd .. && rm -rf apache-log4cxx-${LOG4CXX_VERSION}*
+    \
+    && make -j$(nproc) \
+    && make install \
+    \
+    && cd .. \
+    && rm -rf apache-log4cxx-${LOG4CXX_VERSION}*
+
 
 
 # ------------------------------------------------------------------------
