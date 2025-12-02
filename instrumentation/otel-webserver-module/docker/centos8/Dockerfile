@@ -209,10 +209,5 @@ RUN cd /otel-webserver-module/build && \
     sed -i "8i load_module /opt/opentelemetry-webserver-sdk/WebServerModule/Nginx/${NGINX_VERSION}/ngx_http_opentelemetry_module.so;" /etc/nginx/nginx.conf && \
     sed -i "33i include /opt/opentelemetry_module.conf;" /etc/nginx/nginx.conf
 
-# ------------------------------------------------------------------------
-# Cleanup
-# ------------------------------------------------------------------------
-RUN rm -rf /var/cache/dnf/* /tmp/*
-
 COPY entrypoint.sh /usr/local/bin/
 ENTRYPOINT ["entrypoint.sh"]
