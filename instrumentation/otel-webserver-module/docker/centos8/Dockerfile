@@ -1,7 +1,7 @@
 # ========================================================================
 # Base: Debian 12 (Bookworm) + GCC 12 + glibc 2.36 + Python 2.7.8
 # ========================================================================
-FROM debian:12
+FROM debian:14
 
 ARG BUILD_NUMBER
 LABEL NAME="apm/build-image-nginx-otel-debian12-x64" VERSION=$BUILD_NUMBER
@@ -154,22 +154,39 @@ RUN mkdir -p /dependencies/apache-log4cxx/${LOG4CXX_VERSION} \
 # ------------------------------------------------------------------------
 # Build OpenTelemetry C++ SDK
 # ------------------------------------------------------------------------
-RUN mkdir -p /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/lib \
+RUN mkdir -p dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/lib \
+    && mkdir -p /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/include \
     && git clone https://github.com/open-telemetry/opentelemetry-cpp \
-    && cd opentelemetry-cpp \
+    && cd opentelemetry-cpp/ \
     && git checkout tags/v${OPENTELEMETRY_VERSION} -b v${OPENTELEMETRY_VERSION} \
     && git submodule update --init --recursive \
-    && mkdir build && cd build \
+    && mkdir build \
+    && cd build \
     && cmake .. \
         -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
         -DBUILD_TESTING=OFF \
+        -DBUILD_SHARED_LIBS=ON \
         -DWITH_OTLP=ON \
         -DWITH_OTLP_GRPC=ON \
         -DWITH_OTLP_HTTP=ON \
-        -DBUILD_SHARED_LIBS=ON \
+        -DCMAKE_CXX_STANDARD=14 \
+        -DCMAKE_CXX_STANDARD_REQUIRED=ON \
+        -DCMAKE_PREFIX_PATH="/usr" \
+        -DProtobuf_INCLUDE_DIR=/usr/include \
+        -DgRPC_DIR=/usr/lib64/cmake/grpc \
+        -Dabsl_DIR=/usr/lib64/cmake/absl \
         -DCMAKE_INSTALL_PREFIX=/dependencies/opentelemetry/${OPENTELEMETRY_VERSION} \
-    && make -j$(nproc) && make install \
-    && cd ../.. && rm -rf opentelemetry-cpp
+    && cmake --build . --target all -j$(nproc) \
+    && cmake --install . \
+    && cd .. \
+    && find . -name "*.so" -type f -exec cp {} /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/lib/ \; \
+    && cp -r build/* /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/lib \
+    && cp -r api/include/ /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/ \
+    && for dir in exporters/*; do if [ -d "$dir" ]; then cp -rf "$dir/include" /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/; fi; done \
+    && cp -r sdk/include/ /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/ \
+    && cp -r ext/include/ /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/ || true \
+    && cp -r build/generated/third_party/opentelemetry-proto/opentelemetry/proto/ /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/include/opentelemetry/ \
+    && cd .. && rm -rf opentelemetry-cpp
 
 
 # ------------------------------------------------------------------------
