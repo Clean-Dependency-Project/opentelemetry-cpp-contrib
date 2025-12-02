@@ -1,13 +1,13 @@
 # ========================================================================
-# Base: Debian 12 (Bookworm) + GCC 12 + glibc 2.36 + Python 2.7.8
+# Base: Debian 14 (Trixie)
 # ========================================================================
-FROM debian:14
+FROM debian:trixie
 
 ARG BUILD_NUMBER
-LABEL NAME="apm/build-image-nginx-otel-debian12-x64" VERSION=$BUILD_NUMBER
+LABEL NAME="apm/build-image-nginx-otel-debian14-x64" VERSION=$BUILD_NUMBER
 
-ENV LANG=C.UTF-8
 ENV DEBIAN_FRONTEND=noninteractive
+ENV LANG=C.UTF-8
 
 ARG NGINX_VERSION="1.29.3"
 ARG OPENTELEMETRY_VERSION="1.23.0"
