@@ -57,10 +57,12 @@ ARG CMAKE_VERSION="3.29.3"
 RUN wget https://cmake.org/files/v${CMAKE_VERSION%.*}/cmake-${CMAKE_VERSION}-linux-x86_64.tar.gz \
     && tar -xvf cmake-${CMAKE_VERSION}-linux-x86_64.tar.gz \
     && cd cmake-${CMAKE_VERSION}-linux-x86_64 \
-    && cp -rf * /usr/local/ \
+    && cp -rf bin /usr/local/ \
+    && cp -rf share /usr/local/ \
     && cd .. \
     && rm -rf cmake-${CMAKE_VERSION}-linux-x86_64* \
     && cmake --version
+
 
 
 RUN git clone https://github.com/grpc/grpc \
