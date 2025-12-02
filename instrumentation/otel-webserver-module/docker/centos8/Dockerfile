@@ -1,7 +1,7 @@
 # ========================================================================
 # Base: CentOS Stream 9 + GCC 13 + glibc 2.34
 # ========================================================================
-FROM centos:8
+FROM quay.io/centos/centos:stream9
 
 ARG BUILD_NUMBER
 LABEL NAME="apm/build-image-nginx-otel-centos9-x64" VERSION=$BUILD_NUMBER
