@@ -47,7 +47,7 @@ RUN wget http://www.python.org/ftp/python/${PYTHON_VERSION}/Python-${PYTHON_VERS
 # ------------------------------------------------------------------------
 # Directory prep
 # ------------------------------------------------------------------------
-RUN mkdir -p /dependencies
+RUN mkdir -p dependencies
 
 # ------------------------------------------------------------------------
 # Boost
@@ -80,7 +80,8 @@ RUN git clone https://github.com/grpc/grpc \
 # ------------------------------------------------------------------------
 # APR
 # ------------------------------------------------------------------------
-RUN wget https://archive.apache.org/dist/apr/apr-${APR_VERSION}.tar.gz \
+RUN mkdir -p dependencies/apr/${APR_VERSION} \
+    && wget https://archive.apache.org/dist/apr/apr-${APR_VERSION}.tar.gz \
     && tar -xzf apr-${APR_VERSION}.tar.gz \
     && cd apr-${APR_VERSION} \
     && ./configure --prefix=/dependencies/apr/${APR_VERSION} --enable-static=yes --enable-shared=no --with-pic \
@@ -90,23 +91,23 @@ RUN wget https://archive.apache.org/dist/apr/apr-${APR_VERSION}.tar.gz \
 # ------------------------------------------------------------------------
 # Expat
 # ------------------------------------------------------------------------
-RUN wget https://github.com/libexpat/libexpat/releases/download/${EXPAT_RVERSION}/expat-${EXPAT_VERSION}.tar.gz \
-    && tar -xzf expat-${EXPAT_VERSION}.tar.gz \
+RUN mkdir -p dependencies/expat/${EXPAT_VERSION} \
+    && wget https://github.com/libexpat/libexpat/releases/download/${EXPAT_RVERSION}/expat-${EXPAT_VERSION}.tar.gz --no-check-certificate \
+    && tar -xf expat-${EXPAT_VERSION}.tar.gz \
     && cd expat-${EXPAT_VERSION} \
-    && ./configure --prefix=/dependencies/expat/${EXPAT_VERSION} \
-        --enable-shared=no --enable-static=yes --with-pic \
+    && ./configure --prefix=/dependencies/expat/${EXPAT_VERSION} --enable-static=yes --enable-shared=no --with-pic \
     && make -j$(nproc) && make install \
     && cd .. && rm -rf expat-${EXPAT_VERSION}*
 
 # ------------------------------------------------------------------------
 # APR-util
 # ------------------------------------------------------------------------
-RUN wget https://archive.apache.org/dist/apr/apr-util-${APRUTIL_VERSION}.tar.gz \
-    && tar -xzf apr-util-${APRUTIL_VERSION}.tar.gz \
+RUN mkdir -p dependencies/apr-util/${APRUTIL_VERSION} \
+    && wget https://archive.apache.org/dist/apr/apr-util-${APRUTIL_VERSION}.tar.gz --no-check-certificate \
+    && tar -xf apr-util-${APRUTIL_VERSION}.tar.gz \
     && cd apr-util-${APRUTIL_VERSION} \
-    && ./configure \
-        --prefix=/dependencies/apr-util/${APRUTIL_VERSION} \
-        --enable-shared=no --enable-static=yes --with-pic \
+    && ./configure --prefix=/dependencies/apr-util/${APRUTIL_VERSION} \
+        --enable-static=yes --enable-shared=no --with-pic \
         --with-apr=/dependencies/apr/${APR_VERSION} \
         --with-expat=/dependencies/expat/${EXPAT_VERSION} \
     && make -j$(nproc) && make install \
@@ -124,7 +125,8 @@ RUN wget https://ftpmirror.gnu.org/libtool/libtool-${LIBTOOL_VERSION}.tar.gz \
 # ------------------------------------------------------------------------
 # log4cxx (Debian fix)
 # ------------------------------------------------------------------------
-RUN wget https://archive.apache.org/dist/logging/log4cxx/${LOG4CXX_VERSION}/apache-log4cxx-${LOG4CXX_VERSION}.tar.gz \
+RUN mkdir -p dependencies/apache-log4cxx/${LOG4CXX_VERSION} \
+    && wget https://archive.apache.org/dist/logging/log4cxx/${LOG4CXX_VERSION}/apache-log4cxx-${LOG4CXX_VERSION}.tar.gz \
     && tar -xzf apache-log4cxx-${LOG4CXX_VERSION}.tar.gz \
     && cd apache-log4cxx-${LOG4CXX_VERSION} \
     && autoreconf -fi \
@@ -140,13 +142,15 @@ RUN wget https://archive.apache.org/dist/logging/log4cxx/${LOG4CXX_VERSION}/apac
 # ------------------------------------------------------------------------
 # OpenTelemetry C++ SDK (correct + complete)
 # ------------------------------------------------------------------------
-RUN mkdir -p /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/lib \
+
+RUN mkdir -p dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/lib \
     && mkdir -p /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/include \
     && git clone https://github.com/open-telemetry/opentelemetry-cpp \
-    && cd opentelemetry-cpp \
-    && git checkout v${OPENTELEMETRY_VERSION} \
+    && cd opentelemetry-cpp/ \
+    && git checkout tags/v${OPENTELEMETRY_VERSION} -b v${OPENTELEMETRY_VERSION} \
     && git submodule update --init --recursive \
-    && mkdir build && cd build \
+    && mkdir build \
+    && cd build \
     && cmake .. \
         -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
         -DBUILD_TESTING=OFF \
@@ -155,21 +159,32 @@ RUN mkdir -p /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/lib \
         -DWITH_OTLP_GRPC=ON \
         -DWITH_OTLP_HTTP=ON \
         -DCMAKE_CXX_STANDARD=14 \
+        -DCMAKE_CXX_STANDARD_REQUIRED=ON \
+        -DCMAKE_PREFIX_PATH="/usr" \
+        -DProtobuf_INCLUDE_DIR=/usr/include \
+        -DgRPC_DIR=/usr/lib64/cmake/grpc \
+        -Dabsl_DIR=/usr/lib64/cmake/absl \
         -DCMAKE_INSTALL_PREFIX=/dependencies/opentelemetry/${OPENTELEMETRY_VERSION} \
-    && make -j$(nproc) \
-    && make install \
+    && cmake --build . --target all -j$(nproc) \
+    && cmake --install . \
     && cd .. \
+    && find . -name "*.so" -type f -exec cp {} /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/lib/ \; \
+    && cp -r build/* /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/lib \
     && cp -r api/include/ /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/ \
-    && cp -r exporters/*/include /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/ || true \
+    && for dir in exporters/*; do if [ -d "$dir" ]; then cp -rf "$dir/include" /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/; fi; done \
     && cp -r sdk/include/ /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/ \
     && cp -r ext/include/ /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/ || true \
-    && find . -name "*.so" -exec cp {} /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/lib/ \; \
-    && cd .. && rm -rf opentelemetry-cpp
+    && cp -r build/generated/third_party/opentelemetry-proto/opentelemetry/proto/ /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/include/opentelemetry/ \
+    && cd .. \
+    && echo "=========== OTel .so files installed ===========" \
+    && find /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/lib -maxdepth 2 -name "*.so" -print \
+    && echo "===============================================" \
+    && rm -rf opentelemetry-cpp
 
 # ------------------------------------------------------------------------
 # Nginx source
 # ------------------------------------------------------------------------
-RUN mkdir /build-dependencies \
+RUN mkdir build-dependencies \
     && wget http://nginx.org/download/nginx-${NGINX_VERSION}.tar.gz \
     && tar -xzf nginx-${NGINX_VERSION}.tar.gz -C /build-dependencies \
     && rm nginx-${NGINX_VERSION}.tar.gz
@@ -184,9 +199,23 @@ RUN cp -r /dependencies /otel-webserver-module/ \
     && ./gradlew assembleWebServerModule
 
 # ------------------------------------------------------------------------
-# Install nginx
+# Install Nginx binary (Official nginx.org repo for Debian)
 # ------------------------------------------------------------------------
-RUN apt-get update && apt-get install -y nginx && apt-get clean
+RUN apt-get update && apt-get install -y curl gnupg2 ca-certificates lsb-release
+
+# Add official nginx.org signing key
+RUN curl -fsSL https://nginx.org/keys/nginx_signing.key | gpg --dearmor -o /usr/share/keyrings/nginx-keyring.gpg
+
+# Add nginx.org Debian repo
+RUN echo "deb [signed-by=/usr/share/keyrings/nginx-keyring.gpg] \
+    http://nginx.org/packages/mainline/debian `lsb_release -cs` nginx" \
+    > /etc/apt/sources.list.d/nginx.list
+
+# Install exact nginx version (1.29.3)
+RUN apt-get update && \
+    apt-get install -y nginx=${NGINX_VERSION}-1~`lsb_release -cs` && \
+    apt-get clean
+
 
 # ------------------------------------------------------------------------
 # Configure nginx to load module
