@@ -141,33 +141,6 @@ RUN mkdir -p dependencies/apr-util/${APRUTIL_VERSION} \
     && cd .. && rm -rf apr-util-${APRUTIL_VERSION}*
 
 # ------------------------------------------------------------------------
-# install m4 + Perl deps
-# ------------------------------------------------------------------------
-RUN apt-get update && apt-get install -y \
-    m4 \
-    perl \
-    libdata-dumper-simple-perl \
-    libthread-queue-perl \
-    build-essential \
-    wget \
-    && apt-get clean
-
-# ------------------------------------------------------------------------
-# Build Perl from source (equivalent to your yum version)
-# ------------------------------------------------------------------------
-RUN wget http://www.cpan.org/src/${PERL_CPANVERSION}/perl-${PERL_VERSION}.tar.gz \
-    && tar -xzf perl-${PERL_VERSION}.tar.gz \
-    && cd perl-${PERL_VERSION} \
-    && ./Configure -des -Dprefix=/usr/local/perl-${PERL_VERSION} \
-    && make -j$(nproc) \
-    && make test || true \
-    && make install \
-    && cd .. \
-    && rm -rf perl-${PERL_VERSION}* 
-
-ENV PATH="/usr/local/perl-${PERL_VERSION}/bin:${PATH}"
-
-# ------------------------------------------------------------------------
 # install autoconf
 # ------------------------------------------------------------------------
 RUN wget https://ftp.gnu.org/gnu/autoconf/autoconf-${AUTOCONF_VERSION}.tar.gz \
