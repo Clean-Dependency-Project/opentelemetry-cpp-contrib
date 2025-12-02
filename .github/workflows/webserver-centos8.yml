@@ -1,16 +1,16 @@
-name: webserver-debian-build
+name: webserver debian build
 
 on:
   workflow_dispatch:
 
 jobs:
-  webserver-build-test:
+  webserver-build-test-centos8:
+    name: webserver-centos8-build
     runs-on: ubuntu-latest
-    name: webserver-debian-build
 
     steps:
       # --------------------------------------------------------
-      # Checkout repository
+      # Checkout GitHub Repo
       # --------------------------------------------------------
       - name: Checkout repo
         uses: actions/checkout@v4
@@ -22,45 +22,46 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       # --------------------------------------------------------
-      # Build Debian-based Docker image (your new Dockerfile)
+      # Build CentOS 8 Docker Image
       # --------------------------------------------------------
       - name: Build Docker image
         run: |
           cd instrumentation/otel-webserver-module
           docker buildx build \
-            -t otel_webserver_debian \
-            -f docker/debian/Dockerfile \
+            -t apache_centos8 \
+            -f docker/centos8/Dockerfile \
             --load .
 
       # --------------------------------------------------------
-      # Start container using a blocking process (never exits)
+      # Start container & keep it alive
       # --------------------------------------------------------
-      - name: Start container
+      - name: Start persistent container
         run: |
           docker run -idt \
             --entrypoint "" \
-            --name otel_webserver_debian_container \
-            otel_webserver_debian \
+            --name apache_centos8_container \
+            apache_centos8 \
             tail -f /dev/null
 
+          echo "Container started:"
           docker ps -a
 
       # --------------------------------------------------------
-      # Build WebServer Module inside running container
+      # Build inside container
       # --------------------------------------------------------
-      - name: Build webserver module inside container
+      - name: Build module inside container
         run: |
           cd instrumentation/otel-webserver-module
 
-          # clean old contents
-          docker exec otel_webserver_debian_container bash -c \
+          # clean folder inside container
+          docker exec apache_centos8_container bash -c \
             'rm -rf /otel-webserver-module/*'
 
-          # copy repo contents into container
-          docker cp . otel_webserver_debian_container:/otel-webserver-module/
+          # copy latest repo code into container
+          docker cp . apache_centos8_container:/otel-webserver-module/
 
-          # execute gradle build
-          docker exec otel_webserver_debian_container bash -c '
+          # run Gradle build inside CentOS 8 image
+          docker exec apache_centos8_container bash -c '
             cd /otel-webserver-module &&
             rm -rf build &&
             cp -r /dependencies /otel-webserver-module/ &&
@@ -69,27 +70,27 @@ jobs:
           '
 
       # --------------------------------------------------------
-      # Extract build artifacts (.tgz file)
+      # Copy output .tgz artifact
       # --------------------------------------------------------
       - name: Copy artifacts
         run: |
-          mkdir -p /tmp/debian_build
-          docker cp otel_webserver_debian_container:/otel-webserver-module/build/opentelemetry-webserver-sdk-x64-linux.tgz \
-            /tmp/debian_build/
+          mkdir -p /tmp/apache_centos8
+          docker cp apache_centos8_container:/otel-webserver-module/build/opentelemetry-webserver-sdk-x64-linux.tgz \
+            /tmp/apache_centos8/
 
       # --------------------------------------------------------
-      # Upload artifacts
+      # Upload artifact
       # --------------------------------------------------------
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
           name: opentelemetry-webserver-sdk-x64-linux.tgz
-          path: /tmp/debian_build/opentelemetry-webserver-sdk-x64-linux.tgz
+          path: /tmp/apache_centos8/opentelemetry-webserver-sdk-x64-linux.tgz
 
       # --------------------------------------------------------
-      # Cleanup container
+      # Cleanup after workflow
       # --------------------------------------------------------
       - name: Cleanup
         run: |
-          docker stop otel_webserver_debian_container || true
-          docker rm otel_webserver_debian_container || true
+          docker stop apache_centos8_container || true
+          docker rm apache_centos8_container || true
