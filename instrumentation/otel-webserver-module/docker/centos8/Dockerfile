@@ -33,6 +33,7 @@ RUN apt-get update && apt-get install -y \
     build-essential \
     wget \
     xz-utils \
+    git \
     zlib1g-dev \
     libssl-dev \
     libbz2-dev \
