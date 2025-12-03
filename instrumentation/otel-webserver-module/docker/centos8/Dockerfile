@@ -151,7 +151,7 @@ RUN apt-get update && apt-get install -y \
 RUN apt-get update && apt-get install -y m4
 
 # Update perl version
-RUN apt-get install perl-Thread-Queue.noarch -y \
+RUN RUN apt-get update && apt-get install -y libthread-queue-perl \
     && wget http://www.cpan.org/src/${PERL_CPANVERSION}/perl-${PERL_VERSION}.tar.gz \
     && tar -xzf perl-${PERL_VERSION}.tar.gz \
     && cd perl-${PERL_VERSION} \
@@ -162,7 +162,7 @@ RUN apt-get install perl-Thread-Queue.noarch -y \
 ENV PATH=$HOME/localperl/bin:$PATH
 
 # install autoconf
-RUN wget --no-check-certificate https://ftp.gnu.org/gnu/autoconf/autoconf-${AUTOCONF_VERSION}.tar.gz \
+RUN wget  https://ftp.gnu.org/gnu/autoconf/autoconf-${AUTOCONF_VERSION}.tar.gz \
     && tar xzf autoconf-${AUTOCONF_VERSION}.tar.gz  \
     && cd autoconf-${AUTOCONF_VERSION} \
     && ./configure --prefix=/usr/ && make -j && make install && autoconf -V \
