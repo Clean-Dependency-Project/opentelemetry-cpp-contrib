@@ -150,15 +150,11 @@ RUN apt-get update && apt-get install -y \
 # Install m4 FIRST (required by autoconf)
 RUN apt-get update && apt-get install -y m4
 
-# Update perl version
-RUN apt-get update && apt-get install -y libthread-queue-perl \
-    && wget http://www.cpan.org/src/${PERL_CPANVERSION}/perl-${PERL_VERSION}.tar.gz \
-    && tar -xzf perl-${PERL_VERSION}.tar.gz \
-    && cd perl-${PERL_VERSION} \
-    && ./Configure -des -Dprefix=$HOME/localperl \
-    && make \
-    && make test; echo 0 \
-    && make install 
+RUN apt-get update && apt-get install -y \
+    perl \
+    libthread-queue-perl \
+    libdata-dumper-simple-perl
+
 
 # install autoconf
 RUN wget  https://ftp.gnu.org/gnu/autoconf/autoconf-${AUTOCONF_VERSION}.tar.gz \
