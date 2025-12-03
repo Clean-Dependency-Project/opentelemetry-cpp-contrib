@@ -65,11 +65,17 @@ RUN wget http://www.python.org/ftp/python/${PYTHON_VERSION}/Python-${PYTHON_VERS
     && cd .. && rm -rf Python-${PYTHON_VERSION}*
 
 # install cmake 3.20
-RUN wget https://cmake.org/files/v${CMAKE_VERSION}/cmake-${CMAKE_0VERSION}-linux-x86_64.tar.gz \
-  && tar -xvf cmake-${CMAKE_0VERSION}-linux-x86_64.tar.gz \
-  && cd cmake-${CMAKE_0VERSION}-linux-x86_64 \
-  && cp -rf * /usr/local/ \
-  && cd .. && rm -rf cmake-${CMAKE_0VERSION}-linux-x86_64.tar.gz
+
+RUN wget https://cmake.org/files/v${CMAKE_VERSION%.*}/cmake-${CMAKE_VERSION}-linux-x86_64.tar.gz \
+    && tar -xvf cmake-${CMAKE_VERSION}-linux-x86_64.tar.gz \
+    && cd cmake-${CMAKE_VERSION}-linux-x86_64 \
+    && cp -r bin /usr/local/ \
+    && cp -r share /usr/local/ \
+    && cp -r doc/cmake /usr/local/share/doc/cmake || true \
+    && cd .. \
+    && rm -rf cmake-${CMAKE_VERSION}-linux-x86_64* \
+    && cmake --version
+
 
 # install grpc. If planning to upgrade, make sure sed command works
 RUN git clone https://github.com/grpc/grpc \
