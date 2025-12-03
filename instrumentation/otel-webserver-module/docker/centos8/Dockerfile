@@ -159,7 +159,6 @@ RUN apt-get update && apt-get install -y libthread-queue-perl \
     && make \
     && make test; echo 0 \
     && make install 
-ENV PATH=$HOME/localperl/bin:$PATH
 
 # install autoconf
 RUN wget  https://ftp.gnu.org/gnu/autoconf/autoconf-${AUTOCONF_VERSION}.tar.gz \
