@@ -151,7 +151,7 @@ RUN apt-get update && apt-get install -y \
 RUN apt-get update && apt-get install -y m4
 
 # Update perl version
-RUN RUN apt-get update && apt-get install -y libthread-queue-perl \
+RUN apt-get update && apt-get install -y libthread-queue-perl \
     && wget http://www.cpan.org/src/${PERL_CPANVERSION}/perl-${PERL_VERSION}.tar.gz \
     && tar -xzf perl-${PERL_VERSION}.tar.gz \
     && cd perl-${PERL_VERSION} \
