@@ -40,8 +40,17 @@ RUN apt-get update && apt-get install -y \
     libreadline-dev \
     libsqlite3-dev \
     libffi-dev \
+    libncurses-dev \
+    libgdbm-dev \
+    libdb-dev \
+    pkg-config \
+    protobuf-compiler \
+    libprotobuf-dev \
+    libunwind-dev \
+    libz-dev \
     curl \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
+
 
 
 # ------------------------------------------------------------------------
@@ -58,13 +67,11 @@ ARG CMAKE_VERSION="3.29.3"
 RUN wget https://cmake.org/files/v${CMAKE_VERSION%.*}/cmake-${CMAKE_VERSION}-linux-x86_64.tar.gz \
     && tar -xvf cmake-${CMAKE_VERSION}-linux-x86_64.tar.gz \
     && cd cmake-${CMAKE_VERSION}-linux-x86_64 \
-    && cp -rf bin /usr/local/ \
-    && cp -rf share /usr/local/ \
+    && cp -rf bin/* /usr/local/bin/ \
+    && cp -rf share/* /usr/local/share/ \
     && cd .. \
     && rm -rf cmake-${CMAKE_VERSION}-linux-x86_64* \
     && cmake --version
-
-
 
 RUN git clone https://github.com/grpc/grpc \
   && cd grpc \
@@ -140,9 +147,17 @@ RUN mkdir -p dependencies/apr-util/${APRUTIL_VERSION} \
     && make -j$(nproc) && make install \
     && cd .. && rm -rf apr-util-${APRUTIL_VERSION}*
 
-# ------------------------------------------------------------------------
-# install autoconf
-# ------------------------------------------------------------------------
+
+
+RUN apt-get update && apt-get install -y \
+    perl \
+    libdata-dumper-simple-perl \
+    libthread-queue-perl
+
+# Install m4 FIRST (required by autoconf)
+RUN apt-get update && apt-get install -y m4
+
+# Build autoconf manually
 RUN wget https://ftp.gnu.org/gnu/autoconf/autoconf-${AUTOCONF_VERSION}.tar.gz \
     && tar xzf autoconf-${AUTOCONF_VERSION}.tar.gz \
     && cd autoconf-${AUTOCONF_VERSION} \
@@ -151,6 +166,7 @@ RUN wget https://ftp.gnu.org/gnu/autoconf/autoconf-${AUTOCONF_VERSION}.tar.gz \
     && autoconf --version \
     && cd .. \
     && rm -rf autoconf-${AUTOCONF_VERSION}*
+
 
 # ------------------------------------------------------------------------
 # install automake
@@ -218,8 +234,9 @@ RUN mkdir -p dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/lib \
         -DCMAKE_CXX_STANDARD_REQUIRED=ON \
         -DCMAKE_PREFIX_PATH="/usr" \
         -DProtobuf_INCLUDE_DIR=/usr/include \
-        -DgRPC_DIR=/usr/lib64/cmake/grpc \
-        -Dabsl_DIR=/usr/lib64/cmake/absl \
+        -DProtobuf_DIR=/usr/local/lib/cmake/protobuf \
+        -DgRPC_DIR=/usr/local/lib/cmake/grpc \
+        -Dabsl_DIR=/usr/local/lib/cmake/absl \
         -DCMAKE_INSTALL_PREFIX=/dependencies/opentelemetry/${OPENTELEMETRY_VERSION} \
     && cmake --build . --target all -j$(nproc) \
     && cmake --install . \
