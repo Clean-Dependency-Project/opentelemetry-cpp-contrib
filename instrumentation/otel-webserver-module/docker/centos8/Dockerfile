@@ -12,7 +12,9 @@ ENV DEBIAN_FRONTEND=noninteractive
 ARG NGINX_VERSION="1.29.3"
 ARG OPENTELEMETRY_VERSION="1.23.0"
 ARG BOOST_VERSION="1.75.0"
-ARG GRPC_VERSION="1.57.0"
+ARG CMAKE_VERSION="3.20"
+ARG CMAKE_0VERSION="3.20.0"
+ARG GRPC_VERSION="1.49.2"
 ARG LOG4CXX_VERSION="0.11.0"
 ARG APR_VERSION="1.7.0"
 ARG EXPAT_VERSION="2.3.0"
@@ -62,38 +64,25 @@ RUN wget http://www.python.org/ftp/python/${PYTHON_VERSION}/Python-${PYTHON_VERS
     && ./configure --prefix=/usr/local && make -j$(nproc) && make install \
     && cd .. && rm -rf Python-${PYTHON_VERSION}*
 
-ARG CMAKE_VERSION="3.29.3"
+# install cmake 3.20
+RUN wget https://cmake.org/files/v${CMAKE_VERSION}/cmake-${CMAKE_0VERSION}-linux-x86_64.tar.gz \
+  && tar -xvf cmake-${CMAKE_0VERSION}-linux-x86_64.tar.gz \
+  && cd cmake-${CMAKE_0VERSION}-linux-x86_64 \
+  && cp -rf * /usr/local/ \
+  && cd .. && rm -rf cmake-${CMAKE_0VERSION}-linux-x86_64.tar.gz
 
-RUN wget https://cmake.org/files/v${CMAKE_VERSION%.*}/cmake-${CMAKE_VERSION}-linux-x86_64.tar.gz \
-    && tar -xvf cmake-${CMAKE_VERSION}-linux-x86_64.tar.gz \
-    && cd cmake-${CMAKE_VERSION}-linux-x86_64 \
-    && cp -rf bin/* /usr/local/bin/ \
-    && cp -rf share/* /usr/local/share/ \
-    && cd .. \
-    && rm -rf cmake-${CMAKE_VERSION}-linux-x86_64* \
-    && cmake --version
-
+# install grpc. If planning to upgrade, make sure sed command works
 RUN git clone https://github.com/grpc/grpc \
   && cd grpc \
   && git checkout tags/v${GRPC_VERSION} -b v${GRPC_VERSION} \
-  && git submodule update --init --recursive \
-  && sed -i "s/target_link_libraries(bssl ssl crypto)/target_link_libraries(bssl ssl crypto rt)/g" third_party/boringssl-with-bazel/CMakeLists.txt || true \
+  && git submodule update --init \
+  && sed -i "s/target_link_libraries(bssl ssl crypto)/target_link_libraries(bssl ssl crypto rt)/g" third_party/boringssl-with-bazel/CMakeLists.txt \
   && mkdir -p cmake/build \
   && cd cmake/build \
-  && cmake ../.. \
-        -DgRPC_INSTALL=ON \
-        -DCMAKE_BUILD_TYPE=Release \
-        -DgRPC_ABSL_PROVIDER=module \
-        -DgRPC_CARES_PROVIDER=module \
-        -DgRPC_PROTOBUF_PROVIDER=module \
-        -DgRPC_RE2_PROVIDER=module \
-        -DgRPC_SSL_PROVIDER=module \
-        -DgRPC_ZLIB_PROVIDER=module \
-  && make -j$(nproc) \
+  && cmake ../.. -DgRPC_INSTALL=ON -DCMAKE_BUILD_TYPE=Release -DgRPC_ABSL_PROVIDER=module -DgRPC_CARES_PROVIDER=module -DgRPC_PROTOBUF_PROVIDER=module -DgRPC_RE2_PROVIDER=module -DgRPC_SSL_PROVIDER=module -DgRPC_ZLIB_PROVIDER=module \
+  && make \
   && make install \
-  && ldconfig \
-  && cd ../../.. \
-  && rm -rf grpc
+  && cd ../../..
 
 
 # ------------------------------------------------------------------------
@@ -136,17 +125,15 @@ RUN mkdir -p dependencies/expat/${EXPAT_VERSION} \
 # ------------------------------------------------------------------------
 # APR-util
 # ------------------------------------------------------------------------
+# install Apr-util
 RUN mkdir -p dependencies/apr-util/${APRUTIL_VERSION} \
     && wget https://archive.apache.org/dist/apr/apr-util-${APRUTIL_VERSION}.tar.gz --no-check-certificate \
     && tar -xf apr-util-${APRUTIL_VERSION}.tar.gz \
     && cd apr-util-${APRUTIL_VERSION} \
-    && ./configure --prefix=/dependencies/apr-util/${APRUTIL_VERSION} \
-        --enable-static=yes --enable-shared=no --with-pic \
-        --with-apr=/dependencies/apr/${APR_VERSION} \
-        --with-expat=/dependencies/expat/${EXPAT_VERSION} \
-    && make -j$(nproc) && make install \
-    && cd .. && rm -rf apr-util-${APRUTIL_VERSION}*
-
+    && ./configure --prefix=/dependencies/apr-util/${APRUTIL_VERSION} --enable-static=yes --enable-shared=no --with-pic --with-apr=/dependencies/apr/${APR_VERSION} --with-expat=/dependencies/expat/${EXPAT_VERSION} && echo $? \
+    && make -j 6 \
+    && make install \
+    && cd ../ && rm -rf apr-util-${APRUTIL_VERSION} && rm -rf apr-util-${APRUTIL_VERSION}.tar.gz
 
 
 RUN apt-get update && apt-get install -y \
@@ -157,15 +144,23 @@ RUN apt-get update && apt-get install -y \
 # Install m4 FIRST (required by autoconf)
 RUN apt-get update && apt-get install -y m4
 
-# Build autoconf manually
-RUN wget https://ftp.gnu.org/gnu/autoconf/autoconf-${AUTOCONF_VERSION}.tar.gz \
-    && tar xzf autoconf-${AUTOCONF_VERSION}.tar.gz \
+# Update perl version
+RUN yum install perl-Thread-Queue.noarch -y \
+    && wget http://www.cpan.org/src/${PERL_CPANVERSION}/perl-${PERL_VERSION}.tar.gz \
+    && tar -xzf perl-${PERL_VERSION}.tar.gz \
+    && cd perl-${PERL_VERSION} \
+    && ./Configure -des -Dprefix=$HOME/localperl \
+    && make \
+    && make test; echo 0 \
+    && make install 
+ENV PATH=$HOME/localperl/bin:$PATH
+
+# install autoconf
+RUN wget --no-check-certificate https://ftp.gnu.org/gnu/autoconf/autoconf-${AUTOCONF_VERSION}.tar.gz \
+    && tar xzf autoconf-${AUTOCONF_VERSION}.tar.gz  \
     && cd autoconf-${AUTOCONF_VERSION} \
-    && ./configure --prefix=/usr \
-    && make -j$(nproc) && make install \
-    && autoconf --version \
-    && cd .. \
-    && rm -rf autoconf-${AUTOCONF_VERSION}*
+    && ./configure --prefix=/usr/ && make -j && make install && autoconf -V \
+    && cd .. && rm -rf autoconf-${AUTOCONF_VERSION}.tar.gz
 
 
 # ------------------------------------------------------------------------
@@ -228,20 +223,14 @@ RUN mkdir -p dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/lib \
         -DBUILD_TESTING=OFF \
         -DBUILD_SHARED_LIBS=ON \
         -DWITH_OTLP=ON \
-        -DWITH_OTLP_GRPC=ON \
-        -DWITH_OTLP_HTTP=ON \
-        -DCMAKE_CXX_STANDARD=14 \
-        -DCMAKE_CXX_STANDARD_REQUIRED=ON \
-        -DCMAKE_PREFIX_PATH="/usr" \
-        -DProtobuf_INCLUDE_DIR=/usr/include \
-        -DProtobuf_DIR=/usr/local/lib/cmake/protobuf \
-        -DgRPC_DIR=/usr/local/lib/cmake/grpc \
-        -Dabsl_DIR=/usr/local/lib/cmake/absl \
         -DCMAKE_INSTALL_PREFIX=/dependencies/opentelemetry/${OPENTELEMETRY_VERSION} \
     && cmake --build . --target all -j$(nproc) \
     && cmake --install . \
     && cd .. \
     && find . -name "*.so" -type f -exec cp {} /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/lib/ \; \
+    && echo "===== LISTING build/" \
+    && ls -R build/ || true \
+    && echo "===== END LISTING =====" \
     && cp -r build/* /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/lib \
     && cp -r api/include/ /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/ \
     && for dir in exporters/*; do if [ -d "$dir" ]; then cp -rf "$dir/include" /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/; fi; done \
