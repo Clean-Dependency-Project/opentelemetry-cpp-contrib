@@ -211,41 +211,58 @@ RUN mkdir -p dependencies/apache-log4cxx/${LOG4CXX_VERSION} \
 # OpenTelemetry C++ SDK (correct + complete)
 # ------------------------------------------------------------------------
 
-RUN mkdir -p dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/lib \
-    && mkdir -p /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/include \
-    && git clone https://github.com/open-telemetry/opentelemetry-cpp \
-    && cd opentelemetry-cpp/ \
-    && git checkout tags/v${OPENTELEMETRY_VERSION} -b v${OPENTELEMETRY_VERSION} \
-    && git submodule update --init --recursive \
-    && mkdir build \
-    && cd build \
-    && cmake .. \
-        -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
-        -DBUILD_TESTING=OFF \
-        -DBUILD_SHARED_LIBS=ON \
-        -DWITH_OTLP=ON \
-        -DCMAKE_INSTALL_PREFIX=/dependencies/opentelemetry/${OPENTELEMETRY_VERSION} \
-    && cmake --build . --target all -j$(nproc) \
-    && cmake --install . \
-    && cd .. \
-    && find . -name "*.so" -type f -exec cp {} /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/lib/ \; \
-    && echo "===== LISTING build/" \
-    && ls -R build/ || true \
-    && echo "===== END LISTING =====" \
-    && cp -r build/* /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/lib \
-    && cp -r api/include/ /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/ \
-    && for dir in exporters/*; do if [ -d "$dir" ]; then cp -rf "$dir/include" /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/; fi; done \
-    && cp -r sdk/include/ /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/ \
-    && cp -r ext/include/ /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/ || true \
-    && echo "===== LISTING build/generated/third_party =====" \
-    && ls -R build/generated/third_party/ || true \
-    && echo "===== END LISTING =====" \
-    && cp -r build/generated/third_party/opentelemetry-proto/opentelemetry/proto/ /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/include/opentelemetry/ \
-    && cd .. \
-    && echo "=========== OTel .so files installed ===========" \
-    && find /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/lib -maxdepth 2 -name "*.so" -print \
-    && echo "===============================================" \
-    && rm -rf opentelemetry-cpp
+
+# --- OpenTelemetry C++ SDK (install) ---
+RUN mkdir -p /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/lib \
+ && mkdir -p /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/include \
+ && git clone https://github.com/open-telemetry/opentelemetry-cpp \
+ && cd opentelemetry-cpp \
+ && git checkout tags/v${OPENTELEMETRY_VERSION} -b v${OPENTELEMETRY_VERSION} \
+ && git submodule update --init --recursive \
+ && mkdir build && cd build \
+ && cmake .. \
+      -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
+      -DBUILD_TESTING=OFF \
+      -DBUILD_SHARED_LIBS=ON \
+      -DWITH_OTLP=ON \
+      -DCMAKE_INSTALL_PREFIX=/dependencies/opentelemetry/${OPENTELEMETRY_VERSION} \
+ && cmake --build . --target all -j$(nproc) \
+ && cmake --install . \
+ # Copy ONLY the built shared libs into /dependencies/.../lib
+ && find . -type f -name "*.so" -exec cp {} /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/lib/ \; \
+ # Stage public headers from api/, sdk/, ext/
+ && cp -r ../api/include/ /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/ \
+ && cp -r ../sdk/include/ /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/ \
+ && for dir in ../exporters/*; do \
+      if [ -d "$dir/include" ]; then cp -rf "$dir/include" /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/; fi; \
+    done \
+ && cp -r ../ext/include/ /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/ \
+ # ---------- OTLP proto headers: version-resilient copy ----------
+ # Prefer headers installed to the prefix (newer CMake installs, e.g., 1.23.0)
+ && if [ -d "/dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/include/opentelemetry/proto" ]; then \
+      echo "OTLP proto headers found in install prefix."; \
+ # Fallback: FetchContent build-tree (common in newer layouts)
+   elif [ -d "build/_deps/opentelemetry-proto-build/opentelemetry/proto" ]; then \
+      echo "Copying proto headers from _deps build tree..."; \
+      cp -r build/_deps/opentelemetry-proto-build/opentelemetry/proto \
+            /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/include/opentelemetry/; \
+ # Fallback: legacy generated/third_party layout (observed in older OTel C++)
+   elif [ -d "build/generated/third_party/opentelemetry-proto/opentelemetry/proto" ]; then \
+      echo "Copying proto headers from generated/third_party..."; \
+      cp -r build/generated/third_party/opentelemetry-proto/opentelemetry/proto \
+            /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/include/opentelemetry/; \
+   else \
+      echo "ERROR: Could not locate generated opentelemetry/proto headers." >&2; \
+      echo "Scanning build tree for clue..."; \
+      find build -maxdepth 5 -type d -name proto -print; \
+      exit 1; \
+   fi \
+ && cd .. \
+ && echo "=========== OTel .so files installed ===========" \
+ && find /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/lib -maxdepth 2 -name "*.so" -print \
+ && echo "===============================================" \
+ && rm -rf opentelemetry-cpp
+
 
 # ------------------------------------------------------------------------
 # Nginx source
