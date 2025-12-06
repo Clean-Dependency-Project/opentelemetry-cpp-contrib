@@ -1,95 +1,45 @@
-# ========================================================================
-# Base: Debian 12 (Bookworm) + GCC 12 + glibc 2.36 + Python 2.7.8
-# ========================================================================
-FROM debian:12
 
+# ========================================================================
+# Base: CentOS Stream 9 + GCC 13 + glibc 2.34
+# ========================================================================
+FROM quay.io/centos/centos:stream9
 ARG BUILD_NUMBER
-LABEL NAME="apm/build-image-nginx-otel-debian12-x64" VERSION=$BUILD_NUMBER
-
+LABEL NAME="apm/build-image-nginx-otel-centos9-x64" VERSION=$BUILD_NUMBER
 ENV LANG=C.UTF-8
-ENV DEBIAN_FRONTEND=noninteractive
+ENV PATH="/opt/rh/gcc-toolset-13/root/usr/bin:${PATH}"
 
 ARG NGINX_VERSION="1.29.3"
 ARG OPENTELEMETRY_VERSION="1.23.0"
 ARG BOOST_VERSION="1.75.0"
-ARG CMAKE_VERSION="3.20.0"
-ARG CMAKE_0VERSION="3.20.0"
-ARG GRPC_VERSION="1.49.2"
+ARG GRPC_VERSION="1.57.0"
 ARG LOG4CXX_VERSION="0.11.0"
 ARG APR_VERSION="1.7.0"
 ARG EXPAT_VERSION="2.3.0"
-ARG AUTOCONF_VERSION="2.68"
-ARG AUTOMAKE_VERSION="1.16.5"
-ARG PERL_VERSION="5.20.2"
-ARG PERL_CPANVERSION="5.0"
 ARG EXPAT_RVERSION="R_2_3_0"
-ARG APRUTIL_VERSION="1.6.1"
 ARG LIBTOOL_VERSION="2.4.6"
+ARG APRUTIL_VERSION="1.6.1"
 ARG BOOST_FILENAME="boost_1_75_0"
 ARG PYTHON_VERSION="2.7.8"
 
 # ------------------------------------------------------------------------
-# System dependencies
+# Install system tools & build chain
 # ------------------------------------------------------------------------
-RUN apt-get update && apt-get install -y \
-    build-essential \
-    wget \
-    xz-utils \
-    git \
-    zlib1g-dev \
-    libssl-dev \
-    libbz2-dev \
-    libreadline-dev \
-    libsqlite3-dev \
-    libffi-dev \
-    libncurses-dev \
-    libgdbm-dev \
-    libdb-dev \
-    pkg-config \
-    protobuf-compiler \
-    libprotobuf-dev \
-    libunwind-dev \
-    libz-dev \
-    curl \
-    && apt-get clean && rm -rf /var/lib/apt/lists/*
-
-
+RUN dnf -y update && \
+    dnf install -y \
+      gcc-toolset-13 git make wget tar xz unzip which cmake3 \
+      zlib-devel openssl-devel pcre-devel bzip2-devel \
+      java-17-openjdk java-17-openjdk-devel \
+      perl m4 autoconf automake libtool && \
+    dnf clean all
 
 # ------------------------------------------------------------------------
-# Python 2.7.8
+# Build Python 2.7 (for GYP)
 # ------------------------------------------------------------------------
 RUN wget http://www.python.org/ftp/python/${PYTHON_VERSION}/Python-${PYTHON_VERSION}.tar.xz \
-    && tar -xf Python-${PYTHON_VERSION}.tar.xz \
-    && cd Python-${PYTHON_VERSION} \
-    && ./configure --prefix=/usr/local && make -j$(nproc) && make install \
-    && cd .. && rm -rf Python-${PYTHON_VERSION}*
-
-# install cmake 3.20
-
-RUN wget https://cmake.org/files/v${CMAKE_VERSION%.*}/cmake-${CMAKE_VERSION}-linux-x86_64.tar.gz \
-    && tar -xvf cmake-${CMAKE_VERSION}-linux-x86_64.tar.gz \
-    && cd cmake-${CMAKE_VERSION}-linux-x86_64 \
-    && cp -r bin /usr/local/ \
-    && cp -r share /usr/local/ \
-    && cp -r doc/cmake /usr/local/share/doc/cmake || true \
-    && cd .. \
-    && rm -rf cmake-${CMAKE_VERSION}-linux-x86_64* \
-    && cmake --version
-
-
-# install grpc. If planning to upgrade, make sure sed command works
-RUN git clone https://github.com/grpc/grpc \
-  && cd grpc \
-  && git checkout tags/v${GRPC_VERSION} -b v${GRPC_VERSION} \
-  && git submodule update --init \
-  && sed -i "s/target_link_libraries(bssl ssl crypto)/target_link_libraries(bssl ssl crypto rt)/g" third_party/boringssl-with-bazel/CMakeLists.txt \
-  && mkdir -p cmake/build \
-  && cd cmake/build \
-  && cmake ../.. -DgRPC_INSTALL=ON -DCMAKE_BUILD_TYPE=Release -DgRPC_ABSL_PROVIDER=module -DgRPC_CARES_PROVIDER=module -DgRPC_PROTOBUF_PROVIDER=module -DgRPC_RE2_PROVIDER=module -DgRPC_SSL_PROVIDER=module -DgRPC_ZLIB_PROVIDER=module \
-  && make \
-  && make install \
-  && cd ../../..
-
+ && unxz Python-${PYTHON_VERSION}.tar.xz \
+ && tar -xf Python-${PYTHON_VERSION}.tar \
+ && cd Python-${PYTHON_VERSION} && ./configure --prefix=/usr/local && make && make install \
+ && cd .. && rm -rf Python-${PYTHON_VERSION}.tar Python-${PYTHON_VERSION}.tar.xz
 
 # ------------------------------------------------------------------------
 # Directory prep
@@ -97,218 +47,205 @@ RUN git clone https://github.com/grpc/grpc \
 RUN mkdir -p dependencies
 
 # ------------------------------------------------------------------------
-# Boost
+# Install Boost
 # ------------------------------------------------------------------------
-RUN wget https://archives.boost.io/release/${BOOST_VERSION}/source/${BOOST_FILENAME}.tar.gz \
-    && tar -xzf ${BOOST_FILENAME}.tar.gz \
-    && cd ${BOOST_FILENAME} \
-    && ./bootstrap.sh --with-libraries=filesystem,system --prefix=/dependencies/boost/${BOOST_VERSION} \
-    && ./b2 install threading=multi link=static cxxflags="-fPIC" cflags="-fPIC" \
-    && cd .. && rm -rf ${BOOST_FILENAME}*
+RUN wget https://archives.boost.io/release/${BOOST_VERSION}/source/${BOOST_FILENAME}.tar.gz && \
+    tar -xvf ${BOOST_FILENAME}.tar.gz && \
+    cd ${BOOST_FILENAME} && \
+    ./bootstrap.sh --with-libraries=filesystem,system --prefix=/dependencies/boost/${BOOST_VERSION} && \
+    ./b2 install define=BOOST_ERROR_CODE_HEADER_ONLY link=static threading=multi \
+          cxxflags="-fvisibility=hidden -fPIC" cflags="-fvisibility=hidden -fPIC" && \
+    cd .. && rm -rf ${BOOST_FILENAME}*
 
 # ------------------------------------------------------------------------
-# APR
+# Use CentOS/EPEL gRPC/Protobuf/Abseil packages (runtime ABI will match build)
+# ------------------------------------------------------------------------
+RUN dnf install -y epel-release epel-next-release && \
+    dnf config-manager --set-enabled crb && \
+    dnf makecache && \
+    dnf install -y \
+      grpc grpc-devel \
+      protobuf protobuf-devel \
+      abseil-cpp abseil-cpp-devel \
+      re2 re2-devel \
+      c-ares c-ares-devel \
+      zlib zlib-devel openssl openssl-devel && \
+    dnf clean all
+
+# ------------------------------------------------------------------------
+# APR, expat, APR-util
 # ------------------------------------------------------------------------
 RUN mkdir -p dependencies/apr/${APR_VERSION} \
-    && wget https://archive.apache.org/dist/apr/apr-${APR_VERSION}.tar.gz \
-    && tar -xzf apr-${APR_VERSION}.tar.gz \
-    && cd apr-${APR_VERSION} \
-    && ./configure --prefix=/dependencies/apr/${APR_VERSION} --enable-static=yes --enable-shared=no --with-pic \
-    && make -j$(nproc) && make install \
-    && cd .. && rm -rf apr-${APR_VERSION}*
+ && wget https://archive.apache.org/dist/apr/apr-${APR_VERSION}.tar.gz --no-check-certificate \
+ && tar -xf apr-${APR_VERSION}.tar.gz \
+ && cd apr-${APR_VERSION} \
+ && ./configure --prefix=/dependencies/apr/${APR_VERSION} --enable-static=yes --enable-shared=no --with-pic \
+ && make -j$(nproc) && make install \
+ && cd .. && rm -rf apr-${APR_VERSION}*
 
-# ------------------------------------------------------------------------
-# Expat
-# ------------------------------------------------------------------------
 RUN mkdir -p dependencies/expat/${EXPAT_VERSION} \
-    && wget https://github.com/libexpat/libexpat/releases/download/${EXPAT_RVERSION}/expat-${EXPAT_VERSION}.tar.gz --no-check-certificate \
-    && tar -xf expat-${EXPAT_VERSION}.tar.gz \
-    && cd expat-${EXPAT_VERSION} \
-    && ./configure --prefix=/dependencies/expat/${EXPAT_VERSION} --enable-static=yes --enable-shared=no --with-pic \
-    && make -j$(nproc) && make install \
-    && cd .. && rm -rf expat-${EXPAT_VERSION}*
+ && wget https://github.com/libexpat/libexpat/releases/download/${EXPAT_RVERSION}/expat-${EXPAT_VERSION}.tar.gz --no-check-certificate \
+ && tar -xf expat-${EXPAT_VERSION}.tar.gz \
+ && cd expat-${EXPAT_VERSION} \
+ && ./configure --prefix=/dependencies/expat/${EXPAT_VERSION} --enable-static=yes --enable-shared=no --with-pic \
+ && make -j$(nproc) && make install \
+ && cd .. && rm -rf expat-${EXPAT_VERSION}*
 
-# ------------------------------------------------------------------------
-# APR-util
-# ------------------------------------------------------------------------
-# install Apr-util
 RUN mkdir -p dependencies/apr-util/${APRUTIL_VERSION} \
-    && wget https://archive.apache.org/dist/apr/apr-util-${APRUTIL_VERSION}.tar.gz --no-check-certificate \
-    && tar -xf apr-util-${APRUTIL_VERSION}.tar.gz \
-    && cd apr-util-${APRUTIL_VERSION} \
-    && ./configure --prefix=/dependencies/apr-util/${APRUTIL_VERSION} --enable-static=yes --enable-shared=no --with-pic --with-apr=/dependencies/apr/${APR_VERSION} --with-expat=/dependencies/expat/${EXPAT_VERSION} && echo $? \
-    && make -j 6 \
-    && make install \
-    && cd ../ && rm -rf apr-util-${APRUTIL_VERSION} && rm -rf apr-util-${APRUTIL_VERSION}.tar.gz
+ && wget https://archive.apache.org/dist/apr/apr-util-${APRUTIL_VERSION}.tar.gz --no-check-certificate \
+ && tar -xf apr-util-${APRUTIL_VERSION}.tar.gz \
+ && cd apr-util-${APRUTIL_VERSION} \
+ && ./configure --prefix=/dependencies/apr-util/${APRUTIL_VERSION} \
+    --enable-static=yes --enable-shared=no --with-pic \
+    --with-apr=/dependencies/apr/${APR_VERSION} \
+    --with-expat=/dependencies/expat/${EXPAT_VERSION} \
+ && make -j$(nproc) && make install \
+ && cd .. && rm -rf apr-util-${APRUTIL_VERSION}*
 
-
-RUN apt-get update && apt-get install -y \
-    perl \
-    libdata-dumper-simple-perl \
-    libthread-queue-perl
-
-# Install m4 FIRST (required by autoconf)
-RUN apt-get update && apt-get install -y m4
-
-RUN apt-get update && apt-get install -y \
-    perl \
-    libthread-queue-perl \
-    libdata-dumper-simple-perl
-
-
-# install autoconf
-RUN wget  https://ftp.gnu.org/gnu/autoconf/autoconf-${AUTOCONF_VERSION}.tar.gz \
-    && tar xzf autoconf-${AUTOCONF_VERSION}.tar.gz  \
-    && cd autoconf-${AUTOCONF_VERSION} \
-    && ./configure --prefix=/usr/ && make -j && make install && autoconf -V \
-    && cd .. && rm -rf autoconf-${AUTOCONF_VERSION}.tar.gz
-
+RUN wget --no-check-certificate https://ftpmirror.gnu.org/libtool/libtool-${LIBTOOL_VERSION}.tar.gz \
+ && tar xzf libtool-${LIBTOOL_VERSION}.tar.gz \
+ && cd libtool-${LIBTOOL_VERSION} \
+ && ./configure --prefix=/usr \
+ && make -j 6 \
+ && make install \
+ && libtool --version \
+ && cd .. && rm -rf libtool-${LIBTOOL_VERSION}.tar.gz
 
 # ------------------------------------------------------------------------
-# install automake
-# Debian does NOT use --libdir=/usr/lib64. Use /usr/lib.
-# ------------------------------------------------------------------------
-RUN wget https://ftp.gnu.org/gnu/automake/automake-${AUTOMAKE_VERSION}.tar.gz \
-    && tar xzf automake-${AUTOMAKE_VERSION}.tar.gz \
-    && cd automake-${AUTOMAKE_VERSION} \
-    && ./configure --prefix=/usr --libdir=/usr/lib \
-    && make -j$(nproc) && make install \
-    && automake --version \
-    && cd .. \
-    && rm -rf automake-${AUTOMAKE_VERSION}*
-
-# ------------------------------------------------------------------------
-# install libtool
-# ------------------------------------------------------------------------
-RUN wget https://ftpmirror.gnu.org/libtool/libtool-${LIBTOOL_VERSION}.tar.gz \
-    && tar xzf libtool-${LIBTOOL_VERSION}.tar.gz \
-    && cd libtool-${LIBTOOL_VERSION} \
-    && ./configure --prefix=/usr \
-    && make -j$(nproc) && make install \
-    && libtool --version \
-    && cd .. \
-    && rm -rf libtool-${LIBTOOL_VERSION}*
-
-
-# ------------------------------------------------------------------------
-# log4cxx (Debian fix)
+# install log4cxx
 # ------------------------------------------------------------------------
 RUN mkdir -p dependencies/apache-log4cxx/${LOG4CXX_VERSION} \
-    && wget https://archive.apache.org/dist/logging/log4cxx/${LOG4CXX_VERSION}/apache-log4cxx-${LOG4CXX_VERSION}.tar.gz \
-    && tar -xzf apache-log4cxx-${LOG4CXX_VERSION}.tar.gz \
-    && cd apache-log4cxx-${LOG4CXX_VERSION} \
-    && autoreconf -fi \
-    && automake --add-missing --copy --force-missing \
-    && ./configure --prefix=/dependencies/apache-log4cxx/${LOG4CXX_VERSION} \
-        --enable-static=yes --enable-shared=no \
-        --with-pic \
-        --with-apr=/dependencies/apr/${APR_VERSION} \
-        --with-apr-util=/dependencies/apr-util/${APRUTIL_VERSION} \
-    && make -j$(nproc) && make install \
-    && cd .. && rm -rf apache-log4cxx-${LOG4CXX_VERSION}*
+ && wget https://archive.apache.org/dist/logging/log4cxx/${LOG4CXX_VERSION}/apache-log4cxx-${LOG4CXX_VERSION}.tar.gz --no-check-certificate \
+ && tar -xf apache-log4cxx-${LOG4CXX_VERSION}.tar.gz \
+ && cd apache-log4cxx-${LOG4CXX_VERSION} \
+ && ./configure --prefix=/dependencies/apache-log4cxx/${LOG4CXX_VERSION}/ --enable-static=yes --enable-shared=no --with-pic --with-apr=/dependencies/apr/${APR_VERSION}/ --with-apr-util=/dependencies/apr-util/${APRUTIL_VERSION}/ && echo $? \
+ && make -j 6 ; echo 0 \
+ && automake --add-missing \
+ && make install \
+ && cd .. && rm -rf apache-log4cxx-${LOG4CXX_VERSION}.tar.gz && rm -rf apache-log4cxx-${LOG4CXX_VERSION}
 
 # ------------------------------------------------------------------------
-# OpenTelemetry C++ SDK (correct + complete)
+# Build OpenTelemetry C++ SDK  (shared libs + OTLP gRPC/HTTP)
+# PATCH: discovery-based proto header staging
 # ------------------------------------------------------------------------
-
-
-# --- OpenTelemetry C++ SDK (install) ---
 RUN mkdir -p /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/lib \
  && mkdir -p /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/include \
  && git clone https://github.com/open-telemetry/opentelemetry-cpp \
- && cd opentelemetry-cpp \
+ && cd opentelemetry-cpp/ \
  && git checkout tags/v${OPENTELEMETRY_VERSION} -b v${OPENTELEMETRY_VERSION} \
  && git submodule update --init --recursive \
- && mkdir build && cd build \
+ && mkdir build \
+ && cd build \
  && cmake .. \
-      -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
-      -DBUILD_TESTING=OFF \
-      -DBUILD_SHARED_LIBS=ON \
-      -DWITH_OTLP=ON \
-      -DCMAKE_INSTALL_PREFIX=/dependencies/opentelemetry/${OPENTELEMETRY_VERSION} \
+    -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
+    -DBUILD_TESTING=OFF \
+    -DBUILD_SHARED_LIBS=ON \
+    -DWITH_OTLP=ON \
+    -DWITH_OTLP_GRPC=ON \
+    -DWITH_OTLP_HTTP=ON \
+    -DCMAKE_CXX_STANDARD=14 \
+    -DCMAKE_CXX_STANDARD_REQUIRED=ON \
+    -DCMAKE_PREFIX_PATH="/usr" \
+    -DProtobuf_INCLUDE_DIR=/usr/include \
+    -DgRPC_DIR=/usr/lib64/cmake/grpc \
+    -Dabsl_DIR=/usr/lib64/cmake/absl \
+    -DCMAKE_INSTALL_PREFIX=/dependencies/opentelemetry/${OPENTELEMETRY_VERSION} \
  && cmake --build . --target all -j$(nproc) \
  && cmake --install . \
- # Copy ONLY the built shared libs into /dependencies/.../lib
- && find . -type f -name "*.so" -exec cp {} /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/lib/ \; \
- # Stage public headers from api/, sdk/, ext/
- && cp -r ../api/include/ /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/ \
- && cp -r ../sdk/include/ /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/ \
- && for dir in ../exporters/*; do \
-      if [ -d "$dir/include" ]; then cp -rf "$dir/include" /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/; fi; \
-    done \
- && cp -r ../ext/include/ /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/ \
- # ---------- OTLP proto headers: version-resilient copy ----------
- # Prefer headers installed to the prefix (newer CMake installs, e.g., 1.23.0)
- && if [ -d "/dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/include/opentelemetry/proto" ]; then \
-      echo "OTLP proto headers found in install prefix."; \
- # Fallback: FetchContent build-tree (common in newer layouts)
-   elif [ -d "build/_deps/opentelemetry-proto-build/opentelemetry/proto" ]; then \
-      echo "Copying proto headers from _deps build tree..."; \
-      cp -r build/_deps/opentelemetry-proto-build/opentelemetry/proto \
-            /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/include/opentelemetry/; \
- # Fallback: legacy generated/third_party layout (observed in older OTel C++)
-   elif [ -d "build/generated/third_party/opentelemetry-proto/opentelemetry/proto" ]; then \
-      echo "Copying proto headers from generated/third_party..."; \
-      cp -r build/generated/third_party/opentelemetry-proto/opentelemetry/proto \
-            /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/include/opentelemetry/; \
-   else \
-      echo "ERROR: Could not locate generated opentelemetry/proto headers." >&2; \
-      echo "Scanning build tree for clue..."; \
-      find build -maxdepth 5 -type d -name proto -print; \
-      exit 1; \
-   fi \
- && cd .. \
- && echo "=========== OTel .so files installed ===========" \
- && find /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/lib -maxdepth 2 -name "*.so" -print \
- && echo "===============================================" \
- && rm -rf opentelemetry-cpp
-
+ \
+ # Copy any leftover .so from the build tree (belt-and-suspenders)
+ && find . -name "*.so" -type f -exec cp -v {} /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/lib/ \; \
+ \
+ # --- Discover the actual opentelemetry/proto root and stage headers
+ && FOUND_PB_HEADER="$(find . -type f -name '*.pb.h' | head -n 1)" \
+ && if [ -n "$FOUND_PB_HEADER" ]; then \
+      PROTO_ROOT="$(echo "$FOUND_PB_HEADER" | sed -E 's#^(.*opentelemetry/proto).*#\1#')" ; \
+      echo "Discovered proto headers at: $PROTO_ROOT" ; \
+      mkdir -p /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/include/opentelemetry/ ; \
+      cp -r "$PROTO_ROOT" /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/include/opentelemetry/ ; \
+    else \
+      echo "ERROR: Could not locate any generated *.pb.h in build tree." >&2 ; \
+      find . -type d -path '*opentelemetry/proto*' -maxdepth 8 -print || true ; \
+      exit 1 ; \
+    fi \
+ && test -f /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/include/opentelemetry/proto/trace/v1/trace.pb.h \
+ && cd .. && rm -rf opentelemetry-cpp
 
 # ------------------------------------------------------------------------
-# Nginx source
+# Download Nginx source (needed by build)
 # ------------------------------------------------------------------------
 RUN mkdir build-dependencies \
-    && wget http://nginx.org/download/nginx-${NGINX_VERSION}.tar.gz \
-    && tar -xzf nginx-${NGINX_VERSION}.tar.gz -C /build-dependencies \
-    && rm nginx-${NGINX_VERSION}.tar.gz
+ && wget http://nginx.org/download/nginx-${NGINX_VERSION}.tar.gz \
+ && tar -xvf nginx-${NGINX_VERSION}.tar.gz -C /build-dependencies \
+ && rm -f nginx-${NGINX_VERSION}.tar.gz
 
 # ------------------------------------------------------------------------
-# Build module
+# COPY CODE + CRITICAL FIX
 # ------------------------------------------------------------------------
 COPY . /otel-webserver-module
 RUN cp -r /dependencies /otel-webserver-module/ \
-    && cp -r /build-dependencies /otel-webserver-module/ \
-    && cd /otel-webserver-module \
-    && ./gradlew assembleWebServerModule
+ && cp -r /build-dependencies /otel-webserver-module/ \
+ && cd otel-webserver-module \
+ && ./gradlew assembleWebServerModule
 
 # ------------------------------------------------------------------------
-# Install Nginx binary (Official nginx.org repo for Debian)
+# Install Nginx binary
 # ------------------------------------------------------------------------
-RUN apt-get update && apt-get install -y curl gnupg2 ca-certificates lsb-release
-
-# Add official nginx.org signing key
-RUN curl -fsSL https://nginx.org/keys/nginx_signing.key | gpg --dearmor -o /usr/share/keyrings/nginx-keyring.gpg
-
-# Add nginx.org Debian repo
-RUN echo "deb [signed-by=/usr/share/keyrings/nginx-keyring.gpg] \
-    http://nginx.org/packages/mainline/debian `lsb_release -cs` nginx" \
-    > /etc/apt/sources.list.d/nginx.list
-
-# Install exact nginx version (1.29.3)
-RUN apt-get update && \
-    apt-get install -y nginx=${NGINX_VERSION}-1~`lsb_release -cs` && \
-    apt-get clean
-
+RUN echo "[nginx]" > /etc/yum.repos.d/nginx.repo && \
+    echo "name=nginx repo" >> /etc/yum.repos.d/nginx.repo && \
+    echo "baseurl=https://nginx.org/packages/mainline/centos/9/x86_64/" >> /etc/yum.repos.d/nginx.repo && \
+    echo "gpgcheck=1" >> /etc/yum.repos.d/nginx.repo && \
+    echo "enabled=1" >> /etc/yum.repos.d/nginx.repo && \
+    rpm --import https://nginx.org/keys/nginx_signing.key && \
+    wget https://nginx.org/packages/mainline/centos/9/x86_64/RPMS/nginx-${NGINX_VERSION}-1.el9.ngx.x86_64.rpm && \
+    dnf install -y ./nginx-${NGINX_VERSION}-1.el9.ngx.x86_64.rpm && \
+    rm -f nginx-${NGINX_VERSION}-1.el9.ngx.x86_64.rpm && \
+    dnf clean all
 
 # ------------------------------------------------------------------------
-# Configure nginx to load module
+# Configure Nginx to load module + unpack SDK
 # ------------------------------------------------------------------------
-RUN cd /otel-webserver-module/build \
-    && tar -xzf opentelemetry-webserver-sdk-x64-linux.tgz \
-    && mv opentelemetry-webserver-sdk /opt/ \
-    && cp /otel-webserver-module/conf/nginx/opentelemetry_module.conf /opt/ \
-    && sed -i "1iload_module /opt/opentelemetry-webserver-sdk/WebServerModule/Nginx/${NGINX_VERSION}/ngx_http_opentelemetry_module.so;" /etc/nginx/nginx.conf \
-    && sed -i "33i include /opt/opentelemetry_module.conf;" /etc/nginx/nginx.conf
+RUN cd /otel-webserver-module/build && \
+    tar -xf opentelemetry-webserver-sdk-x64-linux.tgz && \
+    mv -f opentelemetry-webserver-sdk /opt/ && \
+    cd / && \
+    cp /otel-webserver-module/conf/nginx/opentelemetry_module.conf /opt/ && \
+    sed -i "8i load_module /opt/opentelemetry-webserver-sdk/WebServerModule/Nginx/${NGINX_VERSION}/ngx_http_opentelemetry_module.so;" /etc/nginx/nginx.conf && \
+    sed -i "33i include /opt/opentelemetry_module.conf;" /etc/nginx/nginx.conf
 
+# ------------------------------------------------------------------------
+# PATCH: Bundle transitive runtime deps into the SDK lib dir and register
+# ------------------------------------------------------------------------
+# 1) Make the SDK lib dir discoverable at runtime
+RUN echo "/opt/opentelemetry-webserver-sdk/sdk_lib/lib" \
+      > /etc/ld.so.conf.d/opentelemetry-webserver-sdk.conf \
+ && ldconfig
+
+# 2) Copy OTel libs we built (if not already present in the tarball)
+RUN cp -v /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/lib/libopentelemetry_*.so \
+          /opt/opentelemetry-webserver-sdk/sdk_lib/lib/ || true
+
+# 3) Resolve and copy transitive dependencies required by OTLP gRPC exporter
+RUN set -euo pipefail; \
+    for LIB in \
+      /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/lib/libopentelemetry_exporter_otlp_grpc.so \
+      /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/lib/libopentelemetry_exporter_otlp_grpc_client.so \
+      /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/lib/libopentelemetry_proto.so \
+    ; do \
+      if [ -f "$LIB" ]; then \
+        echo "Resolving transitive deps for: $LIB"; \
+        ldd "$LIB" | awk '/=>/ && $3 ~ /^\\// {print $3}' | sort -u \
+          | xargs -r -I{} cp -v {} /opt/opentelemetry-webserver-sdk/sdk_lib/lib/ ; \
+      fi ; \
+    done \
+ && ldconfig
+
+# 4) Fail-fast validation: ensure the NGINX module has no missing libs
+RUN echo "==== ldd check (NGINX OTel module) ====" \
+ && ldd /opt/opentelemetry-webserver-sdk/WebServerModule/Nginx/${NGINX_VERSION}/ngx_http_opentelemetry_module.so \
+ && echo "==== nginx -t ====" \
+ && nginx -t
+
+# Entrypoint
 COPY entrypoint.sh /usr/local/bin/
 ENTRYPOINT ["entrypoint.sh"]
