@@ -226,19 +226,40 @@ RUN cp -v /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/lib/libopenteleme
           /opt/opentelemetry-webserver-sdk/sdk_lib/lib/ || true
 
 # 3) Resolve and copy transitive dependencies required by OTLP gRPC exporter
+# RUN set -euo pipefail; \
+#     for LIB in \
+#       /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/lib/libopentelemetry_exporter_otlp_grpc.so \
+#       /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/lib/libopentelemetry_exporter_otlp_grpc_client.so \
+#       /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/lib/libopentelemetry_proto.so \
+#     ; do \
+#       if [ -f "$LIB" ]; then \
+#         echo "Resolving transitive deps for: $LIB"; \
+#         ldd "$LIB" | awk '/=>/ && $3 ~ /^\\// {print $3}' | sort -u \
+#           | xargs -r -I{} cp -v {} /opt/opentelemetry-webserver-sdk/sdk_lib/lib/ ; \
+#       fi ; \
+#     done \
+#  && ldconfig
+
+
 RUN set -euo pipefail; \
-    for LIB in \
-      /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/lib/libopentelemetry_exporter_otlp_grpc.so \
-      /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/lib/libopentelemetry_exporter_otlp_grpc_client.so \
-      /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/lib/libopentelemetry_proto.so \
-    ; do \
-      if [ -f "$LIB" ]; then \
-        echo "Resolving transitive deps for: $LIB"; \
-        ldd "$LIB" | awk '/=>/ && $3 ~ /^\\// {print $3}' | sort -u \
-          | xargs -r -I{} cp -v {} /opt/opentelemetry-webserver-sdk/sdk_lib/lib/ ; \
-      fi ; \
-    done \
- && ldconfig
+  SDK_LIB_DIR="/opt/opentelemetry-webserver-sdk/sdk_lib/lib"; \
+  mkdir -p "${SDK_LIB_DIR}"; \
+  for LIB in \
+    /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/lib/libopentelemetry_exporter_otlp_grpc.so \
+    /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/lib/libopentelemetry_exporter_otlp_grpc_client.so \
+    /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/lib/libopentelemetry_proto.so \
+  ; do \
+    if [ -f "$LIB" ]; then \
+      echo "Resolving transitive deps for: $LIB"; \
+      # Extract absolute paths of shared libs from ldd output.
+      ldd "$LIB" \
+        | awk '/=>/ && $3 ~ /^\// {print $3} !/=>/ {for(i=1;i<=NF;i++) if($i ~ /^\//) print $i}' \
+        | sort -u \
+        | xargs -r -I{} cp -v {} "${SDK_LIB_DIR}/"; \
+    fi; \
+  done \
+  && ldconfig
+
 
 # 4) Fail-fast validation: ensure the NGINX module has no missing libs
 RUN echo "==== ldd check (NGINX OTel module) ====" \
