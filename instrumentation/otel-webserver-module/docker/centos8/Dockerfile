@@ -112,12 +112,12 @@ RUN set -eux; \
 
 # --- Build Apache log4cxx (static, with APR / APR-util) ---
 
+# Build log4cxx
 RUN set -eux; \
     mkdir -p /dependencies/apache-log4cxx/${LOG4CXX_VERSION}; \
     wget https://archive.apache.org/dist/logging/log4cxx/${LOG4CXX_VERSION}/apache-log4cxx-${LOG4CXX_VERSION}.tar.gz --no-check-certificate; \
     tar -xf apache-log4cxx-${LOG4CXX_VERSION}.tar.gz; \
     cd apache-log4cxx-${LOG4CXX_VERSION}; \
-    # Bootstrap Autotools files (installs missing 'compile', etc.)
     autoreconf -fi; \
     ./configure --prefix=/dependencies/apache-log4cxx/${LOG4CXX_VERSION}/ \
         --enable-static=yes --enable-shared=no --with-pic \
@@ -126,9 +126,9 @@ RUN set -eux; \
     make -j"$(nproc)"; \
     make install; \
     cd ..; \
+    rm -rf apache-log4cxx-${LOG4CXX_VERSION}* apache-log4cxx-${LOG4CXX_VERSION}.tar.gz
 
-
-# --- Build OpenTelemetry C++ SDK (shared, OTLP gRPC+HTTP) ---
+# Build OpenTelemetry C++ SDK
 RUN set -eux; \
     mkdir -p /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/lib; \
     mkdir -p /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/include; \
@@ -150,13 +150,12 @@ RUN set -eux; \
       -DProtobuf_DIR="/usr/lib/x86_64-linux-gnu/cmake/protobuf" \
       -DProtobuf_INCLUDE_DIR="/usr/include" \
       -DgRPC_DIR="/usr/lib/x86_64-linux-gnu/cmake/grpc" \
-      -Dabsl_DIR="/usr/lib/x86_64-linux-gnu/cmake/absl" \
-      ; \
+      -Dabsl_DIR="/usr/lib/x86_64-linux-gnu/cmake/absl"; \
     cmake --build . --target all -j"$(nproc)"; \
     cmake --install .; \
-    # Copy any .so artifacts from the build tree (belt-and-suspenders)
+    # copy any .so artifacts (no stray '; ;')
     find . -name "*.so" -type f -exec cp -v {} /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/lib/ \; ; \
-    # Discover proto headers and stage them under include/opentelemetry/
+    # stage generated proto headers
     FOUND_PB_HEADER="$(find . -type f -name '*.pb.h' | head -n 1)"; \
     if [ -n "$FOUND_PB_HEADER" ]; then \
         PROTO_ROOT="$(echo "$FOUND_PB_HEADER" | sed -E 's#^(.*opentelemetry/proto).*#\1#')"; \
@@ -170,6 +169,7 @@ RUN set -eux; \
     test -f /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/include/opentelemetry/proto/trace/v1/trace.pb.h; \
     cd ../..; \
     rm -rf opentelemetry-cpp
+
 
 # --- Download NGINX source (headers used by Gradle build) ---
 RUN set -eux; \
