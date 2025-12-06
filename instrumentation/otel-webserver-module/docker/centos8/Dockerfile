@@ -168,7 +168,8 @@ RUN set -eux; \
         exit 1; \
     fi; \
     test -f /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/include/opentelemetry/proto/trace/v1/trace.pb.h; \
-    cd ../..; rm -rf opentelemetry-cpp
+    cd ../..; \
+    rm -rf opentelemetry-cpp
 
 # --- Download NGINX source (headers used by Gradle build) ---
 RUN set -eux; \
