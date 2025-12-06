@@ -217,7 +217,7 @@ RUN set -eux; \
 # Validate module linkage in the builder image
 RUN set -eux; \
     echo "==== ldd check (NGINX OTEL module) ===="; \
-    ldd /opt/opentelemetry-webserver-sdk/WebServerModule/Nginx/${NGINX_VERSION}/ngx_http_opentelemetry_module.so || true
+    ldd /opt/opentelemetry-webserver-sdk/WebServerModule/Nginx/${NGINX_VERSION}/ngx_http_opentelemetry_module.so || true \
     echo "==== nginx -t ====" \
     nginx -t
 
