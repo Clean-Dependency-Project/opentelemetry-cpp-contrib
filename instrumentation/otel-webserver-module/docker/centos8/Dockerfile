@@ -111,20 +111,22 @@ RUN set -eux; \
     rm -rf libtool-${LIBTOOL_VERSION}.tar.gz libtool-${LIBTOOL_VERSION}
 
 # --- Build Apache log4cxx (static, with APR / APR-util) ---
+
 RUN set -eux; \
     mkdir -p /dependencies/apache-log4cxx/${LOG4CXX_VERSION}; \
     wget https://archive.apache.org/dist/logging/log4cxx/${LOG4CXX_VERSION}/apache-log4cxx-${LOG4CXX_VERSION}.tar.gz --no-check-certificate; \
     tar -xf apache-log4cxx-${LOG4CXX_VERSION}.tar.gz; \
     cd apache-log4cxx-${LOG4CXX_VERSION}; \
+    # Bootstrap Autotools files (installs missing 'compile', etc.)
+    autoreconf -fi; \
     ./configure --prefix=/dependencies/apache-log4cxx/${LOG4CXX_VERSION}/ \
         --enable-static=yes --enable-shared=no --with-pic \
         --with-apr=/dependencies/apr/${APR_VERSION}/ \
         --with-apr-util=/dependencies/apr-util/${APRUTIL_VERSION}/; \
     make -j"$(nproc)"; \
-    automake --add-missing || true; \
     make install; \
     cd ..; \
-    rm -rf apache-log4cxx-${LOG4CXX_VERSION}*
+
 
 # --- Build OpenTelemetry C++ SDK (shared, OTLP gRPC+HTTP) ---
 RUN set -eux; \
