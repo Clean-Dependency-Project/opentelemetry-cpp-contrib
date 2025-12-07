@@ -134,53 +134,83 @@ RUN set -eux; \
     cd ..; \
     rm -rf apache-log4cxx-${LOG4CXX_VERSION}* apache-log4cxx-${LOG4CXX_VERSION}.tar.gz
 
-# Build OpenTelemetry C++ SDK
 
-# Build OpenTelemetry C++ SDK
+# --- after your existing OTel C++ build and Gradle assembleWebServerModule ---
+# You should already have: /otel-webserver-module/build/opentelemetry-webserver-sdk-x64-linux.tgz
+
+# Unpack the produced SDK so we can augment it, then re-pack
 RUN set -eux; \
-    mkdir -p /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/lib; \
-    mkdir -p /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/include; \
-    git clone https://github.com/open-telemetry/opentelemetry-cpp; \
-    cd opentelemetry-cpp; \
-    git checkout tags/v${OPENTELEMETRY_VERSION} -b v${OPENTELEMETRY_VERSION}; \
-    git submodule update --init --recursive; \
-    mkdir build; cd build; \
-    cmake .. \
-      -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
-      -DBUILD_TESTING=OFF \
-      -DBUILD_SHARED_LIBS=ON \
-      -DWITH_OTLP=ON \
-      -DWITH_OTLP_GRPC=ON \
-      -DWITH_OTLP_HTTP=ON \
-      -DCMAKE_CXX_STANDARD=14 \
-      -DCMAKE_CXX_STANDARD_REQUIRED=ON \
-      -DCMAKE_PREFIX_PATH="/usr" \
-      -DProtobuf_DIR="/usr/lib/x86_64-linux-gnu/cmake/protobuf" \
-      -DProtobuf_INCLUDE_DIR="/usr/include" \
-      -DgRPC_DIR="/usr/lib/x86_64-linux-gnu/cmake/grpc" \
-      -Dabsl_DIR="/usr/lib/x86_64-linux-gnu/cmake/absl"; \
-    cmake --build . --target all -j"$(nproc)"; \
-    cmake --install .; \
-    # Copy any .so artifacts
-    find . -name "*.so" -type f -exec cp -v {} /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/lib/ \; ; \
-    # Discover and stage the generated opentelemetry/proto headers
-    PROTO_ROOT_DIR="$(find . -type f -path '*/opentelemetry/proto/*/*.pb.h' \
-                      -printf '%h\n' \
-                      | sed -E 's#^(.*opentelemetry/proto).*#\1#' \
-                      | head -n 1)"; \
-    if [ -n "$PROTO_ROOT_DIR" ] && [ -d "$PROTO_ROOT_DIR" ]; then \
-        echo "Discovered proto root: $PROTO_ROOT_DIR"; \
-        mkdir -p /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/include/opentelemetry/; \
-        cp -r "$PROTO_ROOT_DIR" /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/include/opentelemetry/; \
-    else \
-        echo "ERROR: Could not locate generated opentelemetry/proto/*.pb.h in build tree." >&2; \
-        find . -type f -name '*.pb.h' | sed 's/^/  /'; \
-        exit 1; \
+    cd /otel-webserver-module/build; \
+    tar -xf opentelemetry-webserver-sdk-x64-linux.tgz; \
+    SDK_ROOT="/opt/opentelemetry-webserver-sdk"; \
+    mv -f opentelemetry-webserver-sdk "${SDK_ROOT}"; \
+    # Ensure expected lib directories exist
+    mkdir -p "${SDK_ROOT}/sdk_lib/lib" "${SDK_ROOT}/third_party/lib"; \
+    \
+    # 1) Copy OTel SDK libs you built into sdk_lib/lib
+    cp -v /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/lib/libopentelemetry_*.so \
+          "${SDK_ROOT}/sdk_lib/lib/" || true; \
+    \
+    # 2) Resolve and copy transitive deps (gRPC, Protobuf, Abseil, RE2, c-ares, etc.)
+    #    We walk ldd over key OTel libs and copy any absolute-path .so they reference.
+    SDK_LIB_DIR="${SDK_ROOT}/sdk_lib/lib"; \
+    TP_LIB_DIR="${SDK_ROOT}/third_party/lib"; \
+    for LIB in \
+      "${SDK_LIB_DIR}/libopentelemetry_exporter_otlp_grpc_client.so" \
+      "${SDK_LIB_DIR}/libopentelemetry_exporter_otlp_grpc.so" \
+      "${SDK_LIB_DIR}/libopentelemetry_proto.so" \
+      "${SDK_LIB_DIR}/libopentelemetry_logs.so" \
+      "${SDK_LIB_DIR}/libopentelemetry_metrics.so" \
+    ; do \
+      if [ -f "${LIB}" ]; then \
+        echo "Resolving transitive deps for: ${LIB}"; \
+        ldd "${LIB}" \
+          | awk '/=>/ && $3 ~ /^\// {print $3} !/=>/ {for(i=1;i<=NF;i++) if($i ~ /^\//) print $i}' \
+          | sort -u \
+          | xargs -r -I{} cp -v {} "${TP_LIB_DIR}/"; \
+      fi; \
+    done; \
+    \
+    # 3) Create soname-compatible symlinks required by your NGINX module:
+    #    - libgrpc++.so.1.51 (some distros ship .1.51.1; make a link)
+    #    - libprotobuf.so.32 (some ship .32.x; make a link)
+    if [ -f "${TP_LIB_DIR}/libgrpc++.so.1.51.1" ] && [ ! -f "${TP_LIB_DIR}/libgrpc++.so.1.51" ]; then \
+      ln -sv "${TP_LIB_DIR}/libgrpc++.so.1.51.1" "${TP_LIB_DIR}/libgrpc++.so.1.51"; \
     fi; \
-    # Sanity check: ensure trace proto header exists
-    test -f /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/include/opentelemetry/proto/trace/v1/trace.pb.h; \
-    cd ../..; \
-    rm -rf opentelemetry-cpp
+    if ls "${TP_LIB_DIR}"/libprotobuf.so.32* >/dev/null 2>&1; then \
+      [ -f "${TP_LIB_DIR}/libprotobuf.so.32" ] || ln -sv "$(ls -1 ${TP_LIB_DIR}/libprotobuf.so.32* | head -n1)" "${TP_LIB_DIR}/libprotobuf.so.32"; \
+    fi; \
+    \
+    # 4) Add an installer that registers both lib dirs with ldconfig (and validates linkage)
+    cat > "${SDK_ROOT}/install.sh" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+# Register lib paths
+printf "/opt/opentelemetry-webserver-sdk/sdk_lib/lib\n/opt/opentelemetry-webserver-sdk/third_party/lib\n" \
+  > /etc/ld.so.conf.d/otel-webserver-sdk.conf
+ldconfig
+# Optional linkage validation (comment out if you prefer a silent install)
+if [ -f /opt/opentelemetry-webserver-sdk/WebServerModule/Nginx/1.29.3/ngx_http_opentelemetry_module.so ]; then
+  echo "==== ldd check (NGINX OTEL module) ===="
+  ldd /opt/opentelemetry-webserver-sdk/WebServerModule/Nginx/1.29.3/ngx_http_opentelemetry_module.so | tee /tmp/ldd.out || true
+  awk '/not found/ {print $1}' /tmp/ldd.out | sort -u | sed 's/^/  - /' | grep . && \
+    echo "ERROR: Missing shared libraries. Ensure your container registers the SDK lib paths via ldconfig and that all .so are present." && exit 1 || true
+fi
+echo "OpenTelemetry Webserver SDK installed."
+EOF
+    chmod +x "${SDK_ROOT}/install.sh"; \
+    \
+    # 5) Re-pack the SDK tarball (self-contained)
+    cd "${SDK_ROOT}/.."; \
+    tar -czf /otel-webserver-module/build/opentelemetry-webserver-sdk-x64-linux.tgz \
+      opentelemetry-webserver-sdk; \
+    \
+    # Print a manifest of bundled libs for debugging
+    echo "=== Bundled SDK libs (sdk_lib/lib) ==="; \
+    ls -l "${SDK_LIB_DIR}" | sed 's/^/  /' || true; \
+    echo "=== Bundled third-party libs (third_party/lib) ==="; \
+    ls -l "${TP_LIB_DIR}" | sed 's/^/  /' || true
+
 
 
 
