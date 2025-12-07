@@ -19,7 +19,7 @@ ARG EXPAT_RVERSION="R_2_3_0"
 ARG LIBTOOL_VERSION="2.4.6"
 ARG APRUTIL_VERSION="1.6.1"
 ARG BOOST_FILENAME="boost_1_75_0"
-ARG PYTHON_VERSION="2.7.8"   # remove if not needed
+ARG PYTHON_VERSION="2.7.8"   # remove this if not needed
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV LANG=C.UTF-8
@@ -33,11 +33,9 @@ RUN set -eux; \
     zlib1g-dev libssl-dev libpcre3-dev \
     openjdk-17-jdk \
     perl m4 autoconf automake libtool \
-    libabsl-dev libre2-dev \
-    libc-ares-dev \
+    libabsl-dev libre2-dev libc-ares-dev \
     libgrpc-dev libgrpc++-dev libgrpc++1 \
-    libprotobuf-dev protobuf-compiler \
-    protobuf-compiler-grpc \
+    libprotobuf-dev protobuf-compiler protobuf-compiler-grpc \
     file gnupg patchelf; \
   rm -rf /var/lib/apt/lists/*
 
@@ -56,7 +54,7 @@ RUN set -eux; \
 # ---- Directory prep ----
 RUN mkdir -p /dependencies
 
-# ---- Build Boost (filesystem, system) static with PIC ----
+# ---- Boost (filesystem, system) static with PIC ----
 RUN set -eux; \
   wget https://archives.boost.io/release/${BOOST_VERSION}/source/${BOOST_FILENAME}.tar.gz; \
   tar -xvf ${BOOST_FILENAME}.tar.gz; \
@@ -67,7 +65,7 @@ RUN set -eux; \
   cd ..; \
   rm -rf ${BOOST_FILENAME}*
 
-# ---- Build APR (static) ----
+# ---- APR (static) ----
 RUN set -eux; \
   mkdir -p /dependencies/apr/${APR_VERSION}; \
   wget https://archive.apache.org/dist/apr/apr-${APR_VERSION}.tar.gz --no-check-certificate; \
@@ -77,7 +75,7 @@ RUN set -eux; \
   make -j"$(nproc)"; make install; \
   cd ..; rm -rf apr-${APR_VERSION}*
 
-# ---- Build Expat (static) ----
+# ---- Expat (static) ----
 RUN set -eux; \
   mkdir -p /dependencies/expat/${EXPAT_VERSION}; \
   wget https://github.com/libexpat/libexpat/releases/download/${EXPAT_RVERSION}/expat-${EXPAT_VERSION}.tar.gz --no-check-certificate; \
@@ -87,7 +85,7 @@ RUN set -eux; \
   make -j"$(nproc)"; make install; \
   cd ..; rm -rf expat-${EXPAT_VERSION}*
 
-# ---- Build APR-util (static) ----
+# ---- APR-util (static) ----
 RUN set -eux; \
   mkdir -p /dependencies/apr-util/${APRUTIL_VERSION}; \
   wget https://archive.apache.org/dist/apr/apr-util-${APRUTIL_VERSION}.tar.gz --no-check-certificate; \
@@ -100,7 +98,7 @@ RUN set -eux; \
   make -j"$(nproc)"; make install; \
   cd ..; rm -rf apr-util-${APRUTIL_VERSION}*
 
-# ---- Build libtool (host) ----
+# ---- libtool (host) ----
 RUN set -eux; \
   wget --no-check-certificate https://ftpmirror.gnu.org/libtool/libtool-${LIBTOOL_VERSION}.tar.gz; \
   tar xzf libtool-${LIBTOOL_VERSION}.tar.gz; \
@@ -108,9 +106,9 @@ RUN set -eux; \
   ./configure --prefix=/usr; \
   make -j"$(nproc)"; make install; \
   libtool --version; \
-  cd ..; rm -rf libtool-${LIBTOOL_VERSION}.tar.gz libtool-${LIBTOOL_VERSION}
+  cd ..; rm -rf libtool-${LIBTOOL_VERSION}*
 
-# ---- Build log4cxx (static) ----
+# ---- Apache log4cxx (static) ----
 RUN set -eux; \
   mkdir -p /dependencies/apache-log4cxx/${LOG4CXX_VERSION}; \
   wget https://archive.apache.org/dist/logging/log4cxx/${LOG4CXX_VERSION}/apache-log4cxx-${LOG4CXX_VERSION}.tar.gz --no-check-certificate; \
@@ -122,9 +120,9 @@ RUN set -eux; \
     --with-apr=/dependencies/apr/${APR_VERSION}/ \
     --with-apr-util=/dependencies/apr-util/${APRUTIL_VERSION}/; \
   make -j"$(nproc)"; make install; \
-  cd ..; rm -rf apache-log4cxx-${LOG4CXX_VERSION}* apache-log4cxx-${LOG4CXX_VERSION}.tar.gz
+  cd ..; rm -rf apache-log4cxx-${LOG4CXX_VERSION}*
 
-# ---- Build OpenTelemetry C++ SDK (shared libs) ----
+# ---- OpenTelemetry C++ SDK (shared libs) ----
 RUN set -eux; \
   mkdir -p /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/lib; \
   mkdir -p /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/include; \
@@ -167,14 +165,14 @@ RUN set -eux; \
   test -f /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/include/opentelemetry/proto/trace/v1/trace.pb.h; \
   cd ../..; rm -rf opentelemetry-cpp
 
-# ---- Download NGINX source (headers for module build) ----
+# ---- NGINX source headers (for module build) ----
 RUN set -eux; \
   mkdir /build-dependencies; \
   wget http://nginx.org/download/nginx-${NGINX_VERSION}.tar.gz; \
   tar -xvf nginx-${NGINX_VERSION}.tar.gz -C /build-dependencies; \
   rm -f nginx-${NGINX_VERSION}.tar.gz
 
-# ---- Copy module sources and run Gradle build ----
+# ---- Copy module sources & build ----
 COPY . /otel-webserver-module
 RUN set -eux; \
   cp -r /dependencies /otel-webserver-module/; \
@@ -183,7 +181,7 @@ RUN set -eux; \
   chmod +x ./gradlew; \
   ./gradlew assembleWebServerModule
 
-# ---- Unpack SDK, augment libs (exclude core + OpenSSL), set RPATH, re-pack ----
+# ---- Unpack SDK & augment (exclude core + OpenSSL) ----
 RUN set -eux; \
   cd /otel-webserver-module/build; \
   tar -xf opentelemetry-webserver-sdk-x64-linux.tgz; \
@@ -194,11 +192,11 @@ RUN set -eux; \
   SDK_LIB_DIR="${SDK_ROOT}/sdk_lib/lib"; \
   TP_LIB_DIR="${SDK_ROOT}/third_party/lib"; \
   \
-  # 1) Copy OTel libs into sdk_lib/lib
+  # 1) Copy OTel libs
   cp -v /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/lib/libopentelemetry_*.so "${SDK_LIB_DIR}/" || true; \
   cp -v /usr/local/lib/libopentelemetry_*.so "${SDK_LIB_DIR}/" || true; \
   \
-  # 2) Copy ONLY non-core, non-OpenSSL transitive deps into third_party/lib
+  # 2) Copy ONLY non-core, non-OpenSSL transitive deps
   mkdir -p "${TP_LIB_DIR}"; \
   for LIB in \
     "${SDK_LIB_DIR}/libopentelemetry_exporter_otlp_grpc_client.so" \
@@ -223,28 +221,30 @@ RUN set -eux; \
   fi; \
   if ls "${TP_LIB_DIR}"/libprotobuf.so.32* > /dev/null 2>&1; then \
     [ -f "${TP_LIB_DIR}/libprotobuf.so.32" ] || ln -sv "$(ls -1 ${TP_LIB_DIR}/libprotobuf.so.32* | head -n1)" "${TP_LIB_DIR}/libprotobuf.so.32"; \
-  fi; \
-  \
-  # 4) Installer script (NO global ldconfig)
+  fi
+
+# ---- 4) Create installer (heredoc in its own RUN) ----
+RUN set -eux; \
+  SDK_ROOT="/opt/opentelemetry-webserver-sdk"; \
   cat > "${SDK_ROOT}/install.sh" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
 # No global ldconfig; module relies on $ORIGIN-based RPATH.
 echo "OpenTelemetry Webserver SDK installed."
 EOF
+
+# ---- 5) Post-install + RPATH + sanity + re-pack + manifest (separate RUN) ----
+RUN set -eux; \
+  SDK_ROOT="/opt/opentelemetry-webserver-sdk"; \
+  SDK_LIB_DIR="${SDK_ROOT}/sdk_lib/lib"; \
+  TP_LIB_DIR="${SDK_ROOT}/third_party/lib"; \
   chmod +x "${SDK_ROOT}/install.sh"; \
-  \
-  # 5) Module-local RPATH
   patchelf --set-rpath '$ORIGIN/../sdk_lib/lib:$ORIGIN/../third_party/lib' \
     "${SDK_ROOT}/WebServerModule/Nginx/${NGINX_VERSION}/ngx_http_opentelemetry_module.so"; \
   patchelf --print-rpath \
     "${SDK_ROOT}/WebServerModule/Nginx/${NGINX_VERSION}/ngx_http_opentelemetry_module.so"; \
-  \
-  # 6) Sanity: critical exporter client lib exists
   test -f "${SDK_LIB_DIR}/libopentelemetry_exporter_otlp_grpc_client.so" \
     || (echo "ERROR: missing libopentelemetry_exporter_otlp_grpc_client.so in ${SDK_LIB_DIR}" && ls -l "${SDK_LIB_DIR}" && exit 1); \
-  \
-  # 7) Re-pack augmented SDK tarball
   cd "${SDK_ROOT}/.."; \
   mkdir -p /otel-webserver-module/build; \
   tar -czf /otel-webserver-module/build/opentelemetry-webserver-sdk-x64-linux.tgz \
@@ -254,11 +254,11 @@ EOF
   echo "=== Bundled third-party libs (third_party/lib) ==="; \
   ls -l "${TP_LIB_DIR}" | sed 's/^/  /' || true
 
-# ---- (Optional) ldd module check ----
+# ---- Optional: ldd module check ----
 RUN set -eux; \
   echo "==== ldd check (NGINX OTEL module) ===="; \
   ldd "/opt/opentelemetry-webserver-sdk/WebServerModule/Nginx/${NGINX_VERSION}/ngx_http_opentelemetry_module.so" || true
 
-# ---- Entrypoint (builder stage only) ----
+# ---- Entrypoint (builder stage only; harmless) ----
 COPY entrypoint.sh /usr/local/bin/
 ENTRYPOINT ["entrypoint.sh"]
