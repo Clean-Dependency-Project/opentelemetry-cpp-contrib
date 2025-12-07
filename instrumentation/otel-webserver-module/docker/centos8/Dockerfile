@@ -19,7 +19,7 @@ ARG EXPAT_RVERSION="R_2_3_0"
 ARG LIBTOOL_VERSION="2.4.6"
 ARG APRUTIL_VERSION="1.6.1"
 ARG BOOST_FILENAME="boost_1_75_0"
-ARG PYTHON_VERSION="2.7.8"   # legacy need
+ARG PYTHON_VERSION="2.7.8"   # legacy need if you have old gyp flows
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV LANG=C.UTF-8
@@ -41,7 +41,7 @@ RUN set -eux; \
     file gnupg patchelf; \
   rm -rf /var/lib/apt/lists/*
 
-# ---- Build Python 2.7 (legacy, if needed by gyp) ----
+# ---- Build Python 2.7 (legacy) ----
 RUN set -eux; \
   wget http://www.python.org/ftp/python/${PYTHON_VERSION}/Python-${PYTHON_VERSION}.tar.xz; \
   unxz Python-${PYTHON_VERSION}.tar.xz; \
@@ -150,7 +150,9 @@ RUN set -eux; \
     -Dabsl_DIR="/usr/lib/x86_64-linux-gnu/cmake/absl"; \
   cmake --build . --target all -j"$(nproc)"; \
   cmake --install .; \
+  # Copy any .so artifacts from the build tree to the dependency staging area
   find . -type f -name "*.so" -exec cp -v {} /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/lib/ \; ; \
+  # Discover and stage generated opentelemetry/proto headers
   PROTO_ROOT_DIR="$( \
     find . -type f -path '*/opentelemetry/proto/*/*.pb.h' -printf '%h\n' \
       | sed -E 's#^(.*opentelemetry/proto).*#\1#' | head -n 1 \
@@ -164,6 +166,7 @@ RUN set -eux; \
     find . -type f -name '*.pb.h' | sed 's/^/  /'; \
     exit 1; \
   fi; \
+  # Sanity check: ensure trace proto header exists
   test -f /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/include/opentelemetry/proto/trace/v1/trace.pb.h; \
   cd ../..; rm -rf opentelemetry-cpp
 
@@ -174,7 +177,7 @@ RUN set -eux; \
   tar -xvf nginx-${NGINX_VERSION}.tar.gz -C /build-dependencies; \
   rm -f nginx-${NGINX_VERSION}.tar.gz
 
-# ---- Copy module code and run Gradle build ----
+# ---- Copy your module code and run Gradle build ----
 COPY . /otel-webserver-module
 RUN set -eux; \
   cp -r /dependencies /otel-webserver-module/; \
@@ -193,10 +196,10 @@ RUN set -eux; \
   mkdir -p "${SDK_ROOT}/sdk_lib/lib" "${SDK_ROOT}/third_party/lib"; \
   SDK_LIB_DIR="${SDK_ROOT}/sdk_lib/lib"; \
   TP_LIB_DIR="${SDK_ROOT}/third_party/lib"; \
-  # copy OTel libs from staging + /usr/local/lib
+  # 1) Copy OTel libs from staging + /usr/local/lib (catch all variants)
   cp -v /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/lib/libopentelemetry_*.so "${SDK_LIB_DIR}/" || true; \
   cp -v /usr/local/lib/libopentelemetry_*.so "${SDK_LIB_DIR}/" || true; \
-  # copy transitive deps discovered from key libs
+  # 2) Resolve and copy transitive deps for key OTel libs into third_party/lib
   for LIB in \
     "${SDK_LIB_DIR}/libopentelemetry_exporter_otlp_grpc_client.so" \
     "${SDK_LIB_DIR}/libopentelemetry_exporter_otlp_grpc.so" \
@@ -212,7 +215,7 @@ RUN set -eux; \
         | xargs -r -I{} cp -v {} "${TP_LIB_DIR}/"; \
     fi; \
   done; \
-  # soname-compatible symlinks
+  # 3) Soname-compatible symlinks (common mismatches)
   if [ -f "${TP_LIB_DIR}/libgrpc++.so.1.51.1" ] && [ ! -f "${TP_LIB_DIR}/libgrpc++.so.1.51" ]; then \
     ln -sv "${TP_LIB_DIR}/libgrpc++.so.1.51.1" "${TP_LIB_DIR}/libgrpc++.so.1.51"; \
   fi; \
@@ -220,7 +223,7 @@ RUN set -eux; \
     [ -f "${TP_LIB_DIR}/libprotobuf.so.32" ] || ln -sv "$(ls -1 ${TP_LIB_DIR}/libprotobuf.so.32* | head -n1)" "${TP_LIB_DIR}/libprotobuf.so.32"; \
   fi
 
-# ---- Create installer (no BuildKit heredoc; plain shell heredoc) + RPATH + ldconfig ----
+# ---- Create installer (plain shell heredoc), set RPATH, register loader paths ----
 RUN set -eux; \
   SDK_ROOT="/opt/opentelemetry-webserver-sdk"; \
   SDK_LIB_DIR="${SDK_ROOT}/sdk_lib/lib"; \
@@ -229,10 +232,12 @@ RUN set -eux; \
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Register lib paths
 printf "/opt/opentelemetry-webserver-sdk/sdk_lib/lib\n/opt/opentelemetry-webserver-sdk/third_party/lib\n" \
   > /etc/ld.so.conf.d/otel-webserver-sdk.conf
 ldconfig
 
+# Optional linkage validation (comment out if you prefer a silent install)
 NGINX_VERSION="${NGINX_VERSION:-1.29.3}"
 MODULE="/opt/opentelemetry-webserver-sdk/WebServerModule/Nginx/${NGINX_VERSION}/ngx_http_opentelemetry_module.so"
 if [ -f "${MODULE}" ]; then
@@ -247,12 +252,12 @@ fi
 echo "OpenTelemetry Webserver SDK installed."
 EOF
   chmod +x "${SDK_ROOT}/install.sh"; \
-  # set $ORIGIN-based RPATH on the module for robust runtime
+  # Set $ORIGIN-based RPATH on the module for robust runtime
   patchelf --set-rpath '$ORIGIN/../sdk_lib/lib:$ORIGIN/../third_party/lib' \
     "${SDK_ROOT}/WebServerModule/Nginx/${NGINX_VERSION}/ngx_http_opentelemetry_module.so"; \
   patchelf --print-rpath \
     "${SDK_ROOT}/WebServerModule/Nginx/${NGINX_VERSION}/ngx_http_opentelemetry_module.so"; \
-  # register loader paths now and set sanity check
+  # Register loader paths now and sanity check
   printf '/opt/opentelemetry-webserver-sdk/sdk_lib/lib\n/opt/opentelemetry-webserver-sdk/third_party/lib\n' \
     > /etc/ld.so.conf.d/opentelemetry-webserver-sdk.conf; \
   ldconfig; \
@@ -289,6 +294,7 @@ ENTRYPOINT ["entrypoint.sh"]
 
 # ===============================
 # (Optional) Stage 2: Runtime
+# Use this if you deploy the augmented SDK tarball into a clean image.
 # ===============================
 # FROM nginx:1.29.3 AS runtime
 # COPY --from=builder /otel-webserver-module/build/opentelemetry-webserver-sdk-x64-linux.tgz /tmp/
