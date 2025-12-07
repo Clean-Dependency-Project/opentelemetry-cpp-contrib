@@ -150,9 +150,7 @@ RUN set -eux; \
     -Dabsl_DIR="/usr/lib/x86_64-linux-gnu/cmake/absl"; \
   cmake --build . --target all -j"$(nproc)"; \
   cmake --install .; \
-  # Copy any .so artifacts from the build tree to the dependency staging area
   find . -type f -name "*.so" -exec cp -v {} /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/lib/ \; ; \
-  # Discover and stage generated opentelemetry/proto headers
   PROTO_ROOT_DIR="$( \
     find . -type f -path '*/opentelemetry/proto/*/*.pb.h' -printf '%h\n' \
       | sed -E 's#^(.*opentelemetry/proto).*#\1#' | head -n 1 \
@@ -166,7 +164,6 @@ RUN set -eux; \
     find . -type f -name '*.pb.h' | sed 's/^/  /'; \
     exit 1; \
   fi; \
-  # Sanity check: ensure trace proto header exists
   test -f /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/include/opentelemetry/proto/trace/v1/trace.pb.h; \
   cd ../..; rm -rf opentelemetry-cpp
 
@@ -223,11 +220,9 @@ RUN set -eux; \
     [ -f "${TP_LIB_DIR}/libprotobuf.so.32" ] || ln -sv "$(ls -1 ${TP_LIB_DIR}/libprotobuf.so.32* | head -n1)" "${TP_LIB_DIR}/libprotobuf.so.32"; \
   fi
 
-# ---- Create installer (plain shell heredoc), set RPATH, register loader paths ----
+# ---- Create installer (plain shell heredoc) ----
 RUN set -eux; \
   SDK_ROOT="/opt/opentelemetry-webserver-sdk"; \
-  SDK_LIB_DIR="${SDK_ROOT}/sdk_lib/lib"; \
-  TP_LIB_DIR="${SDK_ROOT}/third_party/lib"; \
   cat > "${SDK_ROOT}/install.sh" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
@@ -251,13 +246,17 @@ fi
 
 echo "OpenTelemetry Webserver SDK installed."
 EOF
+
+# ---- Post-install actions: chmod, RPATH, register loader paths & sanity check ----
+RUN set -eux; \
+  SDK_ROOT="/opt/opentelemetry-webserver-sdk"; \
+  SDK_LIB_DIR="${SDK_ROOT}/sdk_lib/lib"; \
+  TP_LIB_DIR="${SDK_ROOT}/third_party/lib"; \
   chmod +x "${SDK_ROOT}/install.sh"; \
-  # Set $ORIGIN-based RPATH on the module for robust runtime
   patchelf --set-rpath '$ORIGIN/../sdk_lib/lib:$ORIGIN/../third_party/lib' \
     "${SDK_ROOT}/WebServerModule/Nginx/${NGINX_VERSION}/ngx_http_opentelemetry_module.so"; \
   patchelf --print-rpath \
     "${SDK_ROOT}/WebServerModule/Nginx/${NGINX_VERSION}/ngx_http_opentelemetry_module.so"; \
-  # Register loader paths now and sanity check
   printf '/opt/opentelemetry-webserver-sdk/sdk_lib/lib\n/opt/opentelemetry-webserver-sdk/third_party/lib\n' \
     > /etc/ld.so.conf.d/opentelemetry-webserver-sdk.conf; \
   ldconfig; \
@@ -294,7 +293,6 @@ ENTRYPOINT ["entrypoint.sh"]
 
 # ===============================
 # (Optional) Stage 2: Runtime
-# Use this if you deploy the augmented SDK tarball into a clean image.
 # ===============================
 # FROM nginx:1.29.3 AS runtime
 # COPY --from=builder /otel-webserver-module/build/opentelemetry-webserver-sdk-x64-linux.tgz /tmp/
