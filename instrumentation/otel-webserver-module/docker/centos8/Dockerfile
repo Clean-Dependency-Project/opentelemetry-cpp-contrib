@@ -135,6 +135,8 @@ RUN set -eux; \
     rm -rf apache-log4cxx-${LOG4CXX_VERSION}* apache-log4cxx-${LOG4CXX_VERSION}.tar.gz
 
 # Build OpenTelemetry C++ SDK
+
+# Build OpenTelemetry C++ SDK
 RUN set -eux; \
     mkdir -p /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/lib; \
     mkdir -p /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/include; \
@@ -159,22 +161,27 @@ RUN set -eux; \
       -Dabsl_DIR="/usr/lib/x86_64-linux-gnu/cmake/absl"; \
     cmake --build . --target all -j"$(nproc)"; \
     cmake --install .; \
-    # copy any .so artifacts (no stray '; ;')
+    # Copy any .so artifacts
     find . -name "*.so" -type f -exec cp -v {} /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/lib/ \; ; \
-    # stage generated proto headers
-    FOUND_PB_HEADER="$(find . -type f -name '*.pb.h' | head -n 1)"; \
-    if [ -n "$FOUND_PB_HEADER" ]; then \
-        PROTO_ROOT="$(echo "$FOUND_PB_HEADER" | sed -E 's#^(.*opentelemetry/proto).*#\1#')"; \
-        echo "Discovered proto headers at: $PROTO_ROOT"; \
+    # Discover and stage the generated opentelemetry/proto headers
+    PROTO_ROOT_DIR="$(find . -type f -path '*/opentelemetry/proto/*/*.pb.h' \
+                      -printf '%h\n' \
+                      | sed -E 's#^(.*opentelemetry/proto).*#\1#' \
+                      | head -n 1)"; \
+    if [ -n "$PROTO_ROOT_DIR" ] && [ -d "$PROTO_ROOT_DIR" ]; then \
+        echo "Discovered proto root: $PROTO_ROOT_DIR"; \
         mkdir -p /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/include/opentelemetry/; \
-        cp -r "$PROTO_ROOT" /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/include/opentelemetry/; \
+        cp -r "$PROTO_ROOT_DIR" /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/include/opentelemetry/; \
     else \
-        echo "ERROR: Could not locate any generated *.pb.h in build tree." >&2; \
+        echo "ERROR: Could not locate generated opentelemetry/proto/*.pb.h in build tree." >&2; \
+        find . -type f -name '*.pb.h' | sed 's/^/  /'; \
         exit 1; \
     fi; \
+    # Sanity check: ensure trace proto header exists
     test -f /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/include/opentelemetry/proto/trace/v1/trace.pb.h; \
     cd ../..; \
     rm -rf opentelemetry-cpp
+
 
 
 # --- Download NGINX source (headers used by Gradle build) ---
