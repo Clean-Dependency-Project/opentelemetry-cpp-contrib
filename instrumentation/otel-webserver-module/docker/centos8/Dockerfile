@@ -197,15 +197,15 @@ if [ -f /opt/opentelemetry-webserver-sdk/WebServerModule/Nginx/1.29.3/ngx_http_o
     echo "ERROR: Missing shared libraries. Ensure your container registers the SDK lib paths via ldconfig and that all .so are present." && exit 1 || true
 fi
 echo "OpenTelemetry Webserver SDK installed."
-EOF
+
+
+# 5) Re-pack the SDK tarball (self-contained)
+RUN set -eux; \
     chmod +x "${SDK_ROOT}/install.sh"; \
-    \
-    # 5) Re-pack the SDK tarball (self-contained)
     cd "${SDK_ROOT}/.."; \
+    mkdir -p /otel-webserver-module/build; \
     tar -czf /otel-webserver-module/build/opentelemetry-webserver-sdk-x64-linux.tgz \
       opentelemetry-webserver-sdk; \
-    \
-    # Print a manifest of bundled libs for debugging
     echo "=== Bundled SDK libs (sdk_lib/lib) ==="; \
     ls -l "${SDK_LIB_DIR}" | sed 's/^/  /' || true; \
     echo "=== Bundled third-party libs (third_party/lib) ==="; \
