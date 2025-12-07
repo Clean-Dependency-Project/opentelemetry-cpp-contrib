@@ -24,19 +24,22 @@ ENV DEBIAN_FRONTEND=noninteractive
 ENV LANG=C.UTF-8
 
 # --- System toolchain & build deps (Debian) ---
+
 RUN set -eux; \
-    apt-get update; \
-    apt-get install -y --no-install-recommends \
-      build-essential git make wget curl ca-certificates xz-utils tar unzip which \
-      cmake pkg-config ninja-build \
-      zlib1g-dev libssl-dev libpcre3-dev \
-      openjdk-17-jdk \
-      perl m4 autoconf automake libtool \
-      libabsl-dev libre2-dev libgrpc-dev libprotobuf-dev protobuf-compiler \
-      libc-ares-dev \
-      # helpers
-      file gnupg; \
-    rm -rf /var/lib/apt/lists/*
+  apt-get update; \
+  apt-get install -y --no-install-recommends \
+    build-essential git make wget curl ca-certificates xz-utils tar unzip which \
+    cmake pkg-config ninja-build \
+    zlib1g-dev libssl-dev libpcre3-dev \
+    openjdk-17-jdk \
+    perl m4 autoconf automake libtool \
+    libabsl-dev libre2-dev \
+    libc-ares-dev \
+    libgrpc-dev libgrpc++-dev libgrpc++1 \
+    libprotobuf-dev protobuf-compiler \
+    file gnupg; \
+  rm -rf /var/lib/apt/lists/*
+
 
 # --- Build Python 2.7 (for legacy GYP workflows you carried) ---
 RUN set -eux; \
