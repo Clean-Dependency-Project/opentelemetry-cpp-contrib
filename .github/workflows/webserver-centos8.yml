@@ -1,3 +1,4 @@
+
 name: webserver centos8
 
 on:
@@ -8,64 +9,47 @@ jobs:
     name: webserver-centos8-build
     runs-on: ubuntu-latest
 
+    env:
+      DOCKER_BUILDKIT: "1"      # enable BuildKit features if present
+      COMPOSE_DOCKER_CLI_BUILD: "1"
+
     steps:
-      - name: checkout otel webserver
+      - name: Checkout repo
         uses: actions/checkout@v4
 
-      - name: setup buildx
+      - name: Setup Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Build Docker image
+      - name: Build Docker image (CentOS 8)
         run: |
           cd instrumentation/otel-webserver-module
           docker buildx build -t apache_centos8 -f docker/centos8/Dockerfile --load .
 
-      # IMPORTANT FIX: use `tail -f /dev/null` instead of sleep infinity
-      - name: Start container
+      # Create a container only to copy artifacts out (no actual run needed)
+      - name: Create container to copy artifacts
         run: |
-          docker run -idt \
-            --entrypoint "" \
-            --name apache_centos8_container \
-            apache_centos8 \
-            tail -f /dev/null
-
+          docker create --name apache_centos8_container apache_centos8
           docker ps -a
 
-      # Build inside container
-      - name: Build webserver module
-        run: |
-          cd instrumentation/otel-webserver-module
-
-          docker exec apache_centos8_container bash -c \
-            'rm -rf /otel-webserver-module/*'
-
-          docker cp . apache_centos8_container:/otel-webserver-module/
-
-          docker exec apache_centos8_container bash -c '
-            cd /otel-webserver-module &&
-            rm -rf build &&
-            cp -r /dependencies /otel-webserver-module/ &&
-            cp -r /build-dependencies /otel-webserver-module/ &&
-            ./gradlew assembleWebServerModule
-          '
-
-
-      # Copy artifacts
-      - name: Copy artifacts
+      # Copy the **augmented** tarball created by the Dockerfile
+      - name: Copy augmented SDK tarball
         run: |
           mkdir -p /tmp/apache_centos8
+          # Path must match the re-pack step in the Dockerfile (builder stage)
           docker cp apache_centos8_container:/otel-webserver-module/build/opentelemetry-webserver-sdk-x64-linux.tgz \
             /tmp/apache_centos8/
 
-      # Upload artifacts
+          # Sanity check tar contents (should include third_party/lib/)
+          tar -tzf /tmp/apache_centos8/opentelemetry-webserver-sdk-x64-linux.tgz | \
+            grep -E '^opentelemetry-webserver-sdk/third_party/lib/' || \
+            (echo "ERROR: third_party/lib missing in tarball" && exit 1)
+
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: opentelemetry-webserver-sdk-x64-linux.tgz
           path: /tmp/apache_centos8/opentelemetry-webserver-sdk-x64-linux.tgz
 
-      # Stop and remove container  
       - name: Cleanup
         run: |
-          docker stop apache_centos8_container || true
           docker rm apache_centos8_container || true

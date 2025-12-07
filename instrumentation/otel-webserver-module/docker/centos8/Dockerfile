@@ -19,7 +19,7 @@ ARG EXPAT_RVERSION="R_2_3_0"
 ARG LIBTOOL_VERSION="2.4.6"
 ARG APRUTIL_VERSION="1.6.1"
 ARG BOOST_FILENAME="boost_1_75_0"
-ARG PYTHON_VERSION="2.7.8"   # legacy need if you have old gyp flows
+ARG PYTHON_VERSION="2.7.8"   # only if you still need gyp-era tools
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV LANG=C.UTF-8
@@ -41,7 +41,7 @@ RUN set -eux; \
     file gnupg patchelf; \
   rm -rf /var/lib/apt/lists/*
 
-# ---- Build Python 2.7 (legacy) ----
+# ---- Build Python 2.7 (legacy; remove if not needed) ----
 RUN set -eux; \
   wget http://www.python.org/ftp/python/${PYTHON_VERSION}/Python-${PYTHON_VERSION}.tar.xz; \
   unxz Python-${PYTHON_VERSION}.tar.xz; \
@@ -150,7 +150,9 @@ RUN set -eux; \
     -Dabsl_DIR="/usr/lib/x86_64-linux-gnu/cmake/absl"; \
   cmake --build . --target all -j"$(nproc)"; \
   cmake --install .; \
+  # copy built .so from the build tree to a known staging area
   find . -type f -name "*.so" -exec cp -v {} /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/lib/ \; ; \
+  # stage generated headers for exporters
   PROTO_ROOT_DIR="$( \
     find . -type f -path '*/opentelemetry/proto/*/*.pb.h' -printf '%h\n' \
       | sed -E 's#^(.*opentelemetry/proto).*#\1#' | head -n 1 \
@@ -193,10 +195,11 @@ RUN set -eux; \
   mkdir -p "${SDK_ROOT}/sdk_lib/lib" "${SDK_ROOT}/third_party/lib"; \
   SDK_LIB_DIR="${SDK_ROOT}/sdk_lib/lib"; \
   TP_LIB_DIR="${SDK_ROOT}/third_party/lib"; \
-  # 1) Copy OTel libs from staging + /usr/local/lib (catch all variants)
+  # 1) Copy core OTel libs into sdk_lib/lib (from staging + /usr/local/lib)
   cp -v /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/lib/libopentelemetry_*.so "${SDK_LIB_DIR}/" || true; \
   cp -v /usr/local/lib/libopentelemetry_*.so "${SDK_LIB_DIR}/" || true; \
   # 2) Resolve and copy transitive deps for key OTel libs into third_party/lib
+  mkdir -p "${TP_LIB_DIR}"; \
   for LIB in \
     "${SDK_LIB_DIR}/libopentelemetry_exporter_otlp_grpc_client.so" \
     "${SDK_LIB_DIR}/libopentelemetry_exporter_otlp_grpc.so" \
@@ -216,11 +219,11 @@ RUN set -eux; \
   if [ -f "${TP_LIB_DIR}/libgrpc++.so.1.51.1" ] && [ ! -f "${TP_LIB_DIR}/libgrpc++.so.1.51" ]; then \
     ln -sv "${TP_LIB_DIR}/libgrpc++.so.1.51.1" "${TP_LIB_DIR}/libgrpc++.so.1.51"; \
   fi; \
-  if ls "${TP_LIB_DIR}"/libprotobuf.so.32* >/dev/null 2>&1; then \
+  if ls "${TP_LIB_DIR}"/libprotobuf.so.32* >/dev/null 2>&amp;1; then \
     [ -f "${TP_LIB_DIR}/libprotobuf.so.32" ] || ln -sv "$(ls -1 ${TP_LIB_DIR}/libprotobuf.so.32* | head -n1)" "${TP_LIB_DIR}/libprotobuf.so.32"; \
   fi
 
-# ---- Create installer (plain shell heredoc) ----
+# ---- Create installer (plain shell heredoc in its own RUN) ----
 RUN set -eux; \
   SDK_ROOT="/opt/opentelemetry-webserver-sdk"; \
   cat > "${SDK_ROOT}/install.sh" <<'EOF'
@@ -247,7 +250,7 @@ fi
 echo "OpenTelemetry Webserver SDK installed."
 EOF
 
-# ---- Post-install actions: chmod, RPATH, register loader paths & sanity check ----
+# ---- Post-install: chmod, set RPATH, register loader paths, sanity check ----
 RUN set -eux; \
   SDK_ROOT="/opt/opentelemetry-webserver-sdk"; \
   SDK_LIB_DIR="${SDK_ROOT}/sdk_lib/lib"; \
