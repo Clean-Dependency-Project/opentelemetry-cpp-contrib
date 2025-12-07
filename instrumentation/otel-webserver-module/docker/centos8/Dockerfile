@@ -19,12 +19,12 @@ ARG EXPAT_RVERSION="R_2_3_0"
 ARG LIBTOOL_VERSION="2.4.6"
 ARG APRUTIL_VERSION="1.6.1"
 ARG BOOST_FILENAME="boost_1_75_0"
-ARG PYTHON_VERSION="2.7.8"   # legacy need only if required by older gyp flows
+ARG PYTHON_VERSION="2.7.8"   # remove if not needed
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV LANG=C.UTF-8
 
-# ---- System toolchain & build deps ----
+# ---- Toolchain & build deps ----
 RUN set -eux; \
   apt-get update; \
   apt-get install -y --no-install-recommends \
@@ -41,7 +41,7 @@ RUN set -eux; \
     file gnupg patchelf; \
   rm -rf /var/lib/apt/lists/*
 
-# ---- Build Python 2.7 (legacy; remove if not needed) ----
+# ---- (Optional) Build Python 2.7 ----
 RUN set -eux; \
   wget http://www.python.org/ftp/python/${PYTHON_VERSION}/Python-${PYTHON_VERSION}.tar.xz; \
   unxz Python-${PYTHON_VERSION}.tar.xz; \
@@ -56,7 +56,7 @@ RUN set -eux; \
 # ---- Directory prep ----
 RUN mkdir -p /dependencies
 
-# ---- Build Boost (filesystem, system) static with PIC) ----
+# ---- Build Boost (filesystem, system) static with PIC ----
 RUN set -eux; \
   wget https://archives.boost.io/release/${BOOST_VERSION}/source/${BOOST_FILENAME}.tar.gz; \
   tar -xvf ${BOOST_FILENAME}.tar.gz; \
@@ -110,7 +110,7 @@ RUN set -eux; \
   libtool --version; \
   cd ..; rm -rf libtool-${LIBTOOL_VERSION}.tar.gz libtool-${LIBTOOL_VERSION}
 
-# ---- Build Apache log4cxx (static) ----
+# ---- Build log4cxx (static) ----
 RUN set -eux; \
   mkdir -p /dependencies/apache-log4cxx/${LOG4CXX_VERSION}; \
   wget https://archive.apache.org/dist/logging/log4cxx/${LOG4CXX_VERSION}/apache-log4cxx-${LOG4CXX_VERSION}.tar.gz --no-check-certificate; \
@@ -174,7 +174,7 @@ RUN set -eux; \
   tar -xvf nginx-${NGINX_VERSION}.tar.gz -C /build-dependencies; \
   rm -f nginx-${NGINX_VERSION}.tar.gz
 
-# ---- Copy your module code and run Gradle build ----
+# ---- Copy module sources and run Gradle build ----
 COPY . /otel-webserver-module
 RUN set -eux; \
   cp -r /dependencies /otel-webserver-module/; \
@@ -183,7 +183,7 @@ RUN set -eux; \
   chmod +x ./gradlew; \
   ./gradlew assembleWebServerModule
 
-# ---- Unpack the produced SDK and augment it with libs ----
+# ---- Unpack SDK, augment libs (exclude core + OpenSSL), set RPATH, re-pack ----
 RUN set -eux; \
   cd /otel-webserver-module/build; \
   tar -xf opentelemetry-webserver-sdk-x64-linux.tgz; \
@@ -194,11 +194,11 @@ RUN set -eux; \
   SDK_LIB_DIR="${SDK_ROOT}/sdk_lib/lib"; \
   TP_LIB_DIR="${SDK_ROOT}/third_party/lib"; \
   \
-  # 1) Copy OTel libs from staging + /usr/local/lib
+  # 1) Copy OTel libs into sdk_lib/lib
   cp -v /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/lib/libopentelemetry_*.so "${SDK_LIB_DIR}/" || true; \
   cp -v /usr/local/lib/libopentelemetry_*.so "${SDK_LIB_DIR}/" || true; \
   \
-  # 2) Resolve and copy transitive deps for key OTel libs into third_party/lib
+  # 2) Copy ONLY non-core, non-OpenSSL transitive deps into third_party/lib
   mkdir -p "${TP_LIB_DIR}"; \
   for LIB in \
     "${SDK_LIB_DIR}/libopentelemetry_exporter_otlp_grpc_client.so" \
@@ -212,70 +212,39 @@ RUN set -eux; \
       ldd "${LIB}" \
         | awk '/=>/ && $3 ~ /^\// {print $3} !/=>/ {for(i=1;i<=NF;i++) if($i ~ /^\//) print $i}' \
         | sort -u \
+        | grep -Ev '/ld-linux-x86-64\.so\.2$|/libc\.so\.6$|/libm\.so\.6$|/libpthread\.so\.[0-9]+$|/libdl\.so\.[0-9]+$|/librt\.so\.[0-9]+$|/libresolv\.so\.[0-9]+$|/libnsl\.so\.[0-9]+$|/libgcc_s\.so\.[0-9]+$|/libstdc\+\+\.so\.[0-9]+$|/libssl\.so\.[0-9]+$|/libcrypto\.so\.[0-9]+$' \
         | xargs -r -I{} cp -v {} "${TP_LIB_DIR}/"; \
     fi; \
   done; \
   \
-  # 3) Soname-compatible symlinks (common mismatches)
+  # 3) Soname symlinks (common variants)
   if [ -f "${TP_LIB_DIR}/libgrpc++.so.1.51.1" ] && [ ! -f "${TP_LIB_DIR}/libgrpc++.so.1.51" ]; then \
     ln -sv "${TP_LIB_DIR}/libgrpc++.so.1.51.1" "${TP_LIB_DIR}/libgrpc++.so.1.51"; \
   fi; \
-  # Use POSIX redirection (dash-compatible): > /dev/null 2>&1
   if ls "${TP_LIB_DIR}"/libprotobuf.so.32* > /dev/null 2>&1; then \
     [ -f "${TP_LIB_DIR}/libprotobuf.so.32" ] || ln -sv "$(ls -1 ${TP_LIB_DIR}/libprotobuf.so.32* | head -n1)" "${TP_LIB_DIR}/libprotobuf.so.32"; \
-  fi
-
-# ---- Create installer (plain shell heredoc in its own RUN) ----
-RUN set -eux; \
-  SDK_ROOT="/opt/opentelemetry-webserver-sdk"; \
+  fi; \
+  \
+  # 4) Installer script (NO global ldconfig)
   cat > "${SDK_ROOT}/install.sh" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
-
-# Register lib paths
-printf "/opt/opentelemetry-webserver-sdk/sdk_lib/lib\n/opt/opentelemetry-webserver-sdk/third_party/lib\n" \
-  > /etc/ld.so.conf.d/otel-webserver-sdk.conf
-ldconfig
-
-# Optional linkage validation (comment out if you prefer a silent install)
-NGINX_VERSION="${NGINX_VERSION:-1.29.3}"
-MODULE="/opt/opentelemetry-webserver-sdk/WebServerModule/Nginx/${NGINX_VERSION}/ngx_http_opentelemetry_module.so"
-if [ -f "${MODULE}" ]; then
-  echo "==== ldd check (NGINX OTEL module) ===="
-  ldd "${MODULE}" | tee /tmp/ldd.out || true
-  if awk '/not found/ {print $1}' /tmp/ldd.out | sort -u | sed 's/^/  - /' | grep . >/dev/null; then
-    echo "ERROR: Missing shared libraries. Ensure lib paths are registered and required .so exist."
-    exit 1
-  fi
-fi
-
+# No global ldconfig; module relies on $ORIGIN-based RPATH.
 echo "OpenTelemetry Webserver SDK installed."
 EOF
-
-# ---- Post-install: chmod, set RPATH, register loader paths, sanity check ----
-RUN set -eux; \
-  SDK_ROOT="/opt/opentelemetry-webserver-sdk"; \
-  SDK_LIB_DIR="${SDK_ROOT}/sdk_lib/lib"; \
-  TP_LIB_DIR="${SDK_ROOT}/third_party/lib"; \
   chmod +x "${SDK_ROOT}/install.sh"; \
+  \
+  # 5) Module-local RPATH
   patchelf --set-rpath '$ORIGIN/../sdk_lib/lib:$ORIGIN/../third_party/lib' \
     "${SDK_ROOT}/WebServerModule/Nginx/${NGINX_VERSION}/ngx_http_opentelemetry_module.so"; \
   patchelf --print-rpath \
     "${SDK_ROOT}/WebServerModule/Nginx/${NGINX_VERSION}/ngx_http_opentelemetry_module.so"; \
-  printf '/opt/opentelemetry-webserver-sdk/sdk_lib/lib\n/opt/opentelemetry-webserver-sdk/third_party/lib\n' \
-    > /etc/ld.so.conf.d/opentelemetry-webserver-sdk.conf; \
-  ldconfig; \
+  \
+  # 6) Sanity: critical exporter client lib exists
   test -f "${SDK_LIB_DIR}/libopentelemetry_exporter_otlp_grpc_client.so" \
-    || (echo "ERROR: missing libopentelemetry_exporter_otlp_grpc_client.so in ${SDK_LIB_DIR}" && ls -l "${SDK_LIB_DIR}" && exit 1)
-
-# Fallback in case runtime doesn't run ldconfig
-ENV LD_LIBRARY_PATH=/opt/opentelemetry-webserver-sdk/sdk_lib/lib:/opt/opentelemetry-webserver-sdk/third_party/lib
-
-# ---- Re-pack the augmented SDK tarball (self-contained) ----
-RUN set -eux; \
-  SDK_ROOT="/opt/opentelemetry-webserver-sdk"; \
-  SDK_LIB_DIR="${SDK_ROOT}/sdk_lib/lib"; \
-  TP_LIB_DIR="${SDK_ROOT}/third_party/lib"; \
+    || (echo "ERROR: missing libopentelemetry_exporter_otlp_grpc_client.so in ${SDK_LIB_DIR}" && ls -l "${SDK_LIB_DIR}" && exit 1); \
+  \
+  # 7) Re-pack augmented SDK tarball
   cd "${SDK_ROOT}/.."; \
   mkdir -p /otel-webserver-module/build; \
   tar -czf /otel-webserver-module/build/opentelemetry-webserver-sdk-x64-linux.tgz \
@@ -285,28 +254,11 @@ RUN set -eux; \
   echo "=== Bundled third-party libs (third_party/lib) ==="; \
   ls -l "${TP_LIB_DIR}" | sed 's/^/  /' || true
 
-# ---- Validate module linkage in the builder image ----
+# ---- (Optional) ldd module check ----
 RUN set -eux; \
   echo "==== ldd check (NGINX OTEL module) ===="; \
-  ldd "/opt/opentelemetry-webserver-sdk/WebServerModule/Nginx/${NGINX_VERSION}/ngx_http_opentelemetry_module.so" || true; \
-  echo "==== nginx -t ===="; \
-  nginx -t || true
+  ldd "/opt/opentelemetry-webserver-sdk/WebServerModule/Nginx/${NGINX_VERSION}/ngx_http_opentelemetry_module.so" || true
 
-# ---- Entrypoint ----
+# ---- Entrypoint (builder stage only) ----
 COPY entrypoint.sh /usr/local/bin/
 ENTRYPOINT ["entrypoint.sh"]
-
-# ===============================
-# (Optional) Stage 2: Runtime
-# ===============================
-# FROM nginx:1.29.3 AS runtime
-# COPY --from=builder /otel-webserver-module/build/opentelemetry-webserver-sdk-x64-linux.tgz /tmp/
-# RUN set -eux; \
-#   tar -xf /tmp/opentelemetry-webserver-sdk-x64-linux.tgz -C /opt; \
-#   rm /tmp/opentelemetry-webserver-sdk-x64-linux.tgz; \
-#   printf '/opt/opentelemetry-webserver-sdk/sdk_lib/lib\n/opt/opentelemetry-webserver-sdk/third_party/lib\n' \
-#     > /etc/ld.so.conf.d/opentelemetry-webserver-sdk.conf; \
-#   ldconfig
-# ENV LD_LIBRARY_PATH=/opt/opentelemetry-webserver-sdk/sdk_lib/lib:/opt/opentelemetry-webserver-sdk/third_party/lib
-# COPY entrypoint.sh /usr/local/bin/
-# ENTRYPOINT ["entrypoint.sh"]
