@@ -152,7 +152,7 @@ RUN set -eux; \
   find . -type f -name "*.so" -exec cp -v {} /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/lib/ \; ; \
   cd ../..
 
-# ---- Discover and copy generated proto headers (helper script avoids parser issues) ----
+# ---- Discover and copy generated proto headers (helper script)
 RUN set -eux; \
   cat > /tmp/copy_proto.sh <<'EOF'
 #!/usr/bin/env bash
@@ -173,7 +173,10 @@ else
 fi
 test -f "/dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/include/opentelemetry/proto/trace/v1/trace.pb.h"
 EOF
-  chmod +x /tmp/copy_proto.sh; \
+  chmod +x /tmp/copy_proto.sh
+
+# Execute the helper against the opentelemetry-cpp tree and clean up
+RUN set -eux; \
   cd /opentelemetry-cpp; \
   /tmp/copy_proto.sh; \
   cd /; \
