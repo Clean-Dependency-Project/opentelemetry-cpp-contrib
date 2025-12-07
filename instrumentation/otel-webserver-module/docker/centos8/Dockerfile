@@ -2,11 +2,11 @@
 # syntax=docker/dockerfile:1.4
 
 # ===============================
-# Stage 1: BUILD on Debian 12
+# Stage 1: BUILD on Debian 13 (Trixie)
 # ===============================
-FROM debian:12-slim AS builder
+FROM debian:trixie-slim AS builder
 ARG BUILD_NUMBER
-LABEL NAME="apm/build-image-nginx-otel-debian12-x64" VERSION=${BUILD_NUMBER}
+LABEL NAME="apm/build-image-nginx-otel-debian13-x64" VERSION=${BUILD_NUMBER}
 
 # ---- Versions ----
 ARG NGINX_VERSION="1.29.3"
@@ -19,12 +19,13 @@ ARG EXPAT_RVERSION="R_2_3_0"
 ARG LIBTOOL_VERSION="2.4.6"
 ARG APRUTIL_VERSION="1.6.1"
 ARG BOOST_FILENAME="boost_1_75_0"
-ARG PYTHON_VERSION="2.7.8"   # remove this if not needed
+# NOTE: Python 2.7 is obsolete; leave arg to keep parity with your current build.
+ARG PYTHON_VERSION="2.7.8"
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV LANG=C.UTF-8
 
-# ---- Toolchain & build deps ----
+# ---- Toolchain & build deps (Trixie: GCC 14, OpenSSL 3.5.x, newer glibc) ----
 RUN set -eux; \
   apt-get update; \
   apt-get install -y --no-install-recommends \
@@ -39,7 +40,7 @@ RUN set -eux; \
     file gnupg patchelf; \
   rm -rf /var/lib/apt/lists/*
 
-# ---- (Optional) Build Python 2.7 ----
+# ---- (Optional) Build Python 2.7 to preserve your original pipeline ----
 RUN set -eux; \
   wget http://www.python.org/ftp/python/${PYTHON_VERSION}/Python-${PYTHON_VERSION}.tar.xz; \
   unxz Python-${PYTHON_VERSION}.tar.xz; \
@@ -149,9 +150,10 @@ RUN set -eux; \
   cmake --build . --target all -j"$(nproc)"; \
   cmake --install .; \
   find . -type f -name "*.so" -exec cp -v {} /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/lib/ \; ; \
-  PROTO_ROOT_DIR="$( \
-    find . -type f -path '*/opentelemetry/proto/*/*.pb.h' -printf '%h\n' \
-      | sed -E 's#^(.*opentelemetry/proto).*#\1#' | head -n 1 \
+  PROTO_ROOT_DIR="$(
+    find . -type f -path '*/opentelemetry/proto/*/*.pb.h' -printf '%h\n' | \
+    sed -E 's#^(.*opentelemetry/proto).*#\1#' | \
+    head -n 1
   )"; \
   if [ -n "${PROTO_ROOT_DIR}" ] && [ -d "${PROTO_ROOT_DIR}" ]; then \
     echo "Discovered proto root: ${PROTO_ROOT_DIR}"; \
@@ -159,7 +161,7 @@ RUN set -eux; \
     cp -r "${PROTO_ROOT_DIR}" /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/include/opentelemetry/; \
   else \
     echo "ERROR: Could not locate generated opentelemetry/proto/*.pb.h in build tree." >&2; \
-    find . -type f -name '*.pb.h' | sed 's/^/  /'; \
+    find . -type f -name '*.pb.h' | sed 's/^/ /'; \
     exit 1; \
   fi; \
   test -f /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/include/opentelemetry/proto/trace/v1/trace.pb.h; \
@@ -172,7 +174,7 @@ RUN set -eux; \
   tar -xvf nginx-${NGINX_VERSION}.tar.gz -C /build-dependencies; \
   rm -f nginx-${NGINX_VERSION}.tar.gz
 
-# ---- Copy module sources & build ----
+# ---- Copy module sources & build (kept identical to your pipeline) ----
 COPY . /otel-webserver-module
 RUN set -eux; \
   cp -r /dependencies /otel-webserver-module/; \
@@ -207,11 +209,11 @@ RUN set -eux; \
   ; do \
     if [ -f "${LIB}" ]; then \
       echo "Resolving transitive deps for: ${LIB}"; \
-      ldd "${LIB}" \
-        | awk '/=>/ && $3 ~ /^\// {print $3} !/=>/ {for(i=1;i<=NF;i++) if($i ~ /^\//) print $i}' \
-        | sort -u \
-        | grep -Ev '/ld-linux-x86-64\.so\.2$|/libc\.so\.6$|/libm\.so\.6$|/libpthread\.so\.[0-9]+$|/libdl\.so\.[0-9]+$|/librt\.so\.[0-9]+$|/libresolv\.so\.[0-9]+$|/libnsl\.so\.[0-9]+$|/libgcc_s\.so\.[0-9]+$|/libstdc\+\+\.so\.[0-9]+$|/libssl\.so\.[0-9]+$|/libcrypto\.so\.[0-9]+$' \
-        | xargs -r -I{} cp -v {} "${TP_LIB_DIR}/"; \
+      ldd "${LIB}" | \
+      awk '/=>/ && $3 ~ /^\// {print $3} !/=>/ {for(i=1;i<=NF;i++) if($i ~ /^\//) print $i}' | \
+      sort -u | \
+      grep -Ev '/ld-linux-x86-64\.so\.2$|/libc\.so\.6$|/libm\.so\.6$|/libpthread\.so\.[0-9]+$|/libdl\.so\.[0-9]+$|/librt\.so\.[0-9]+$|/libresolv\.so\.[0-9]+$|/libnsl\.so\.[0-9]+$|/libgcc_s\.so\.[0-9]+$|/libstdc\+\+\.so\.[0-9]+$|/libssl\.so\.[0-9]+$|/libcrypto\.so\.[0-9]+$' | \
+      xargs -r -I{} cp -v {} "${TP_LIB_DIR}/"; \
     fi; \
   done; \
   \
@@ -219,11 +221,11 @@ RUN set -eux; \
   if [ -f "${TP_LIB_DIR}/libgrpc++.so.1.51.1" ] && [ ! -f "${TP_LIB_DIR}/libgrpc++.so.1.51" ]; then \
     ln -sv "${TP_LIB_DIR}/libgrpc++.so.1.51.1" "${TP_LIB_DIR}/libgrpc++.so.1.51"; \
   fi; \
-  if ls "${TP_LIB_DIR}"/libprotobuf.so.32* > /dev/null 2>&1; then \
+  if ls "${TP_LIB_DIR}"/libprotobuf.so.32* >/dev/null 2>&1; then \
     [ -f "${TP_LIB_DIR}/libprotobuf.so.32" ] || ln -sv "$(ls -1 ${TP_LIB_DIR}/libprotobuf.so.32* | head -n1)" "${TP_LIB_DIR}/libprotobuf.so.32"; \
   fi
 
-# ---- 4) Create installer (heredoc in its own RUN) ----
+# ---- Create installer (same behavior as yours: rely on $ORIGIN RPATH, no ldconfig) ----
 RUN set -eux; \
   SDK_ROOT="/opt/opentelemetry-webserver-sdk"; \
   cat > "${SDK_ROOT}/install.sh" <<'EOF'
@@ -233,7 +235,7 @@ set -euo pipefail
 echo "OpenTelemetry Webserver SDK installed."
 EOF
 
-# ---- 5) Post-install + RPATH + sanity + re-pack + manifest (separate RUN) ----
+# ---- Post-install + RPATH + sanity + re-pack ----
 RUN set -eux; \
   SDK_ROOT="/opt/opentelemetry-webserver-sdk"; \
   SDK_LIB_DIR="${SDK_ROOT}/sdk_lib/lib"; \
@@ -243,18 +245,18 @@ RUN set -eux; \
     "${SDK_ROOT}/WebServerModule/Nginx/${NGINX_VERSION}/ngx_http_opentelemetry_module.so"; \
   patchelf --print-rpath \
     "${SDK_ROOT}/WebServerModule/Nginx/${NGINX_VERSION}/ngx_http_opentelemetry_module.so"; \
-  test -f "${SDK_LIB_DIR}/libopentelemetry_exporter_otlp_grpc_client.so" \
-    || (echo "ERROR: missing libopentelemetry_exporter_otlp_grpc_client.so in ${SDK_LIB_DIR}" && ls -l "${SDK_LIB_DIR}" && exit 1); \
+  test -f "${SDK_LIB_DIR}/libopentelemetry_exporter_otlp_grpc_client.so" || \
+    (echo "ERROR: missing libopentelemetry_exporter_otlp_grpc_client.so in ${SDK_LIB_DIR}" && ls -l "${SDK_LIB_DIR}" && exit 1); \
   cd "${SDK_ROOT}/.."; \
   mkdir -p /otel-webserver-module/build; \
   tar -czf /otel-webserver-module/build/opentelemetry-webserver-sdk-x64-linux.tgz \
     opentelemetry-webserver-sdk; \
   echo "=== Bundled SDK libs (sdk_lib/lib) ==="; \
-  ls -l "${SDK_LIB_DIR}" | sed 's/^/  /' || true; \
+  ls -l "${SDK_LIB_DIR}" || true; \
   echo "=== Bundled third-party libs (third_party/lib) ==="; \
-  ls -l "${TP_LIB_DIR}" | sed 's/^/  /' || true
+  ls -l "${TP_LIB_DIR}" || true
 
-# ---- Optional: ldd module check ----
+# ---- Optional: ldd module check (kept) ----
 RUN set -eux; \
   echo "==== ldd check (NGINX OTEL module) ===="; \
   ldd "/opt/opentelemetry-webserver-sdk/WebServerModule/Nginx/${NGINX_VERSION}/ngx_http_opentelemetry_module.so" || true
@@ -262,3 +264,29 @@ RUN set -eux; \
 # ---- Entrypoint (builder stage only; harmless) ----
 COPY entrypoint.sh /usr/local/bin/
 ENTRYPOINT ["entrypoint.sh"]
+
+
+# ===============================
+# (Optional) Stage 2: RUNTIME test on your base NGINX
+# ===============================
+# Uncomment this if you want an all-in-one image to test the freshly-built module.
+# FROM artifactory.fanniemae.com/fnm-vtm-staging-release/nginx:1.29.3 AS runtime
+# USER root
+# COPY --from=builder /otel-webserver-module/build/opentelemetry-webserver-sdk-x64-linux.tgz /opt/
+# RUN set -eux; \
+#   cd /opt && tar -zvxf opentelemetry-webserver-sdk-x64-linux.tgz && rm -f opentelemetry-webserver-sdk-x64-linux.tgz && \
+#   /opt/opentelemetry-webserver-sdk/install.sh && \
+#   # Insert load_module only once (installer might already add it)
+#   if ! grep -q 'ngx_http_opentelemetry_module.so' /etc/nginx/nginx.conf; then \
+#     sed -i '1iload_module /opt/opentelemetry-webserver-sdk/WebServerModule/Nginx/1.29.3/ngx_http_opentelemetry_module.so;' /etc/nginx/nginx.conf; \
+#   fi && \
+#   chmod -R a+rX /opt/opentelemetry-webserver-sdk && \
+#   nginx -t
+# # Minimal otel.conf to verify module loads without network
+# RUN printf '%s\n' \
+#   'NginxModuleEnabled ON;' \
+#   'NginxModuleOtelSpanExporter ostream;' \
+#   'NginxModuleServiceName nginx;' \
+#   'NginxModuleServiceNamespace default;' \
+#   > /etc/nginx/conf.d/otel.conf
+# CMD ["nginx", "-g", "daemon off;"]
