@@ -19,7 +19,7 @@ ARG EXPAT_RVERSION="R_2_3_0"
 ARG LIBTOOL_VERSION="2.4.6"
 ARG APRUTIL_VERSION="1.6.1"
 ARG BOOST_FILENAME="boost_1_75_0"
-ARG PYTHON_VERSION="2.7.8"   # only if you still need gyp-era tools
+ARG PYTHON_VERSION="2.7.8"   # legacy need only if required by older gyp flows
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV LANG=C.UTF-8
@@ -56,7 +56,7 @@ RUN set -eux; \
 # ---- Directory prep ----
 RUN mkdir -p /dependencies
 
-# ---- Build Boost (filesystem, system) static with PIC ----
+# ---- Build Boost (filesystem, system) static with PIC) ----
 RUN set -eux; \
   wget https://archives.boost.io/release/${BOOST_VERSION}/source/${BOOST_FILENAME}.tar.gz; \
   tar -xvf ${BOOST_FILENAME}.tar.gz; \
@@ -150,9 +150,7 @@ RUN set -eux; \
     -Dabsl_DIR="/usr/lib/x86_64-linux-gnu/cmake/absl"; \
   cmake --build . --target all -j"$(nproc)"; \
   cmake --install .; \
-  # copy built .so from the build tree to a known staging area
   find . -type f -name "*.so" -exec cp -v {} /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/lib/ \; ; \
-  # stage generated headers for exporters
   PROTO_ROOT_DIR="$( \
     find . -type f -path '*/opentelemetry/proto/*/*.pb.h' -printf '%h\n' \
       | sed -E 's#^(.*opentelemetry/proto).*#\1#' | head -n 1 \
@@ -195,9 +193,11 @@ RUN set -eux; \
   mkdir -p "${SDK_ROOT}/sdk_lib/lib" "${SDK_ROOT}/third_party/lib"; \
   SDK_LIB_DIR="${SDK_ROOT}/sdk_lib/lib"; \
   TP_LIB_DIR="${SDK_ROOT}/third_party/lib"; \
-  # 1) Copy core OTel libs into sdk_lib/lib (from staging + /usr/local/lib)
+  \
+  # 1) Copy OTel libs from staging + /usr/local/lib
   cp -v /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/lib/libopentelemetry_*.so "${SDK_LIB_DIR}/" || true; \
   cp -v /usr/local/lib/libopentelemetry_*.so "${SDK_LIB_DIR}/" || true; \
+  \
   # 2) Resolve and copy transitive deps for key OTel libs into third_party/lib
   mkdir -p "${TP_LIB_DIR}"; \
   for LIB in \
@@ -215,11 +215,13 @@ RUN set -eux; \
         | xargs -r -I{} cp -v {} "${TP_LIB_DIR}/"; \
     fi; \
   done; \
+  \
   # 3) Soname-compatible symlinks (common mismatches)
   if [ -f "${TP_LIB_DIR}/libgrpc++.so.1.51.1" ] && [ ! -f "${TP_LIB_DIR}/libgrpc++.so.1.51" ]; then \
     ln -sv "${TP_LIB_DIR}/libgrpc++.so.1.51.1" "${TP_LIB_DIR}/libgrpc++.so.1.51"; \
   fi; \
-  if ls "${TP_LIB_DIR}"/libprotobuf.so.32* >/dev/null 2>&amp;1; then \
+  # Use POSIX redirection (dash-compatible): > /dev/null 2>&1
+  if ls "${TP_LIB_DIR}"/libprotobuf.so.32* > /dev/null 2>&1; then \
     [ -f "${TP_LIB_DIR}/libprotobuf.so.32" ] || ln -sv "$(ls -1 ${TP_LIB_DIR}/libprotobuf.so.32* | head -n1)" "${TP_LIB_DIR}/libprotobuf.so.32"; \
   fi
 
@@ -269,7 +271,7 @@ RUN set -eux; \
 # Fallback in case runtime doesn't run ldconfig
 ENV LD_LIBRARY_PATH=/opt/opentelemetry-webserver-sdk/sdk_lib/lib:/opt/opentelemetry-webserver-sdk/third_party/lib
 
-# ---- Re-pack the SDK tarball (self-contained) ----
+# ---- Re-pack the augmented SDK tarball (self-contained) ----
 RUN set -eux; \
   SDK_ROOT="/opt/opentelemetry-webserver-sdk"; \
   SDK_LIB_DIR="${SDK_ROOT}/sdk_lib/lib"; \
