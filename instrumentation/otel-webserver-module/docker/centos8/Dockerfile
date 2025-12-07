@@ -227,8 +227,14 @@ RUN set -eux; \
     [ -f "${TP_LIB_DIR}/libprotobuf.so.32" ] || ln -sv "$(ls -1 ${TP_LIB_DIR}/libprotobuf.so.32* | head -n1)" "${TP_LIB_DIR}/libprotobuf.so.32"; \
   fi; \
   \
-  # 4) Installer script that registers lib paths and validates linkage
-  cat > "${SDK_ROOT}/install.sh" <<'EOF'
+ 
+# 4) Add an installer that registers both lib dirs with ldconfig (and validates linkage)
+RUN <<'SCRIPT'
+set -eux
+
+SDK_ROOT="/opt/opentelemetry-webserver-sdk"
+
+cat > "${SDK_ROOT}/install.sh" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
 
@@ -237,35 +243,45 @@ printf "/opt/opentelemetry-webserver-sdk/sdk_lib/lib\n/opt/opentelemetry-webserv
   > /etc/ld.so.conf.d/otel-webserver-sdk.conf
 ldconfig
 
-# Optional linkage validation
+# Optional linkage validation (comment out if you prefer a silent install)
 NGINX_VERSION="${NGINX_VERSION:-1.29.3}"
 MODULE="/opt/opentelemetry-webserver-sdk/WebServerModule/Nginx/${NGINX_VERSION}/ngx_http_opentelemetry_module.so"
 if [ -f "${MODULE}" ]; then
   echo "==== ldd check (NGINX OTEL module) ===="
   ldd "${MODULE}" | tee /tmp/ldd.out || true
   if awk '/not found/ {print $1}' /tmp/ldd.out | sort -u | sed 's/^/  - /' | grep . >/dev/null; then
-    echo "ERROR: Missing shared libraries. Ensure paths are registered via ldconfig and .so are present."
+    echo "ERROR: Missing shared libraries. Ensure your container registers the SDK lib paths via ldconfig and that all .so are present."
     exit 1
   fi
 fi
 
 echo "OpenTelemetry Webserver SDK installed."
 EOF
+SCRIPT
+
+# 5) Post-install actions: chmod, set RPATH, register loader paths, and sanity check
+RUN set -eux; \
+  SDK_ROOT="/opt/opentelemetry-webserver-sdk"; \
+  SDK_LIB_DIR="${SDK_ROOT}/sdk_lib/lib"; \
+  TP_LIB_DIR="${SDK_ROOT}/third_party/lib"; \
+  \
   chmod +x "${SDK_ROOT}/install.sh"; \
   \
-  # 5) Set relative RPATH on module so it prefers SDK libs next to itself (robust runtime)
+  # Set relative RPATH on module so it prefers SDK libs next to itself (robust runtime)
   patchelf --set-rpath '$ORIGIN/../sdk_lib/lib:$ORIGIN/../third_party/lib' \
     "${SDK_ROOT}/WebServerModule/Nginx/${NGINX_VERSION}/ngx_http_opentelemetry_module.so"; \
-  patchelf --print-rpath "${SDK_ROOT}/WebServerModule/Nginx/${NGINX_VERSION}/ngx_http_opentelemetry_module.so"; \
+  patchelf --print-rpath \
+    "${SDK_ROOT}/WebServerModule/Nginx/${NGINX_VERSION}/ngx_http_opentelemetry_module.so"; \
   \
-  # 6) Register loader paths now and set a fallback LD_LIBRARY_PATH
+  # Register loader paths now and set a fallback LD_LIBRARY_PATH
   printf '/opt/opentelemetry-webserver-sdk/sdk_lib/lib\n/opt/opentelemetry-webserver-sdk/third_party/lib\n' \
     > /etc/ld.so.conf.d/opentelemetry-webserver-sdk.conf; \
   ldconfig; \
   \
-  # 7) Sanity: ensure the missing exporter client lib is present
+  # Sanity: ensure the missing exporter client lib is present
   test -f "${SDK_LIB_DIR}/libopentelemetry_exporter_otlp_grpc_client.so" \
     || (echo "ERROR: missing libopentelemetry_exporter_otlp_grpc_client.so in ${SDK_LIB_DIR}" && ls -l "${SDK_LIB_DIR}" && exit 1)
+
 
 # Provide fallback in case runtime image doesn't run ldconfig
 ENV LD_LIBRARY_PATH=/opt/opentelemetry-webserver-sdk/sdk_lib/lib:/opt/opentelemetry-webserver-sdk/third_party/lib
