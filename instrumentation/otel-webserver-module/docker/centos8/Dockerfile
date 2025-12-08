@@ -19,13 +19,13 @@ ARG LIBTOOL_VERSION="2.4.6"
 ARG APRUTIL_VERSION="1.6.1"
 ARG BOOST_FILENAME="boost_1_75_0"
 
-# Optional (kept for parity with your current pipeline)
+# Optional (pipeline parity)
 ARG PYTHON_VERSION="2.7.8"
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV LANG=C.UTF-8
 
-# ---- Toolchain & build deps (Trixie: GCC 14, OpenSSL 3.5.x, newer glibc) ----
+# ---- Toolchain & build deps ----
 RUN set -eux; \
     apt-get update; \
     apt-get install -y --no-install-recommends \
@@ -40,7 +40,7 @@ RUN set -eux; \
       file gnupg patchelf; \
     rm -rf /var/lib/apt/lists/*
 
-# ---- (Optional) Build Python 2.7 to preserve original pipeline ----
+# ---- (Optional) Python 2.7 ----
 RUN set -eux; \
     wget http://www.python.org/ftp/python/${PYTHON_VERSION}/Python-${PYTHON_VERSION}.tar.xz; \
     unxz Python-${PYTHON_VERSION}.tar.xz; \
@@ -52,7 +52,7 @@ RUN set -eux; \
     cd ..; \
     rm -rf Python-${PYTHON_VERSION}.tar Python-${PYTHON_VERSION}
 
-# ---- Directory prep ----
+# ---- Dir prep ----
 RUN mkdir -p /dependencies
 
 # ---- Boost (filesystem, system) static with PIC ----
@@ -151,12 +151,8 @@ RUN set -eux; \
     cmake --install .; \
     find . -type f -name "*.so" -exec cp -v {} /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/lib/ \;; \
     cd ../..; \
-    # ---- Discover and copy generated proto headers (inline; no heredoc) ----
-    PROTO_ROOT_DIR="$(
-      find /opentelemetry-cpp -type f -path '*/opentelemetry/proto/*/*.pb.h' -printf '%h\n' \
-      | sed -E 's#^(.*opentelemetry/proto).*#\1#' \
-      | head -n 1
-    )"; \
+    # ---- Discover and copy generated proto headers (single-line, inside RUN) ----
+    PROTO_ROOT_DIR="$(find /opentelemetry-cpp -type f -path '*/opentelemetry/proto/*/*.pb.h' -printf '%h\n' | sed -E 's#^(.*opentelemetry/proto).*#\1#' | head -n 1)"; \
     if [ -n "${PROTO_ROOT_DIR}" ] && [ -d "${PROTO_ROOT_DIR}" ]; then \
       echo "Discovered proto root: ${PROTO_ROOT_DIR}"; \
       mkdir -p /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/include/opentelemetry/; \
@@ -176,7 +172,7 @@ RUN set -eux; \
     tar -xvf nginx-${NGINX_VERSION}.tar.gz -C /build-dependencies; \
     rm -f nginx-${NGINX_VERSION}.tar.gz
 
-# ---- Copy module sources & build (same as your pipeline) ----
+# ---- Copy module sources & build ----
 COPY . /otel-webserver-module
 RUN set -eux; \
     cp -r /dependencies /otel-webserver-module/; \
@@ -228,7 +224,6 @@ RUN set -eux; \
     fi
 
 # ---- Create installer (keep $ORIGIN RPATH; no global ldconfig) ----
-# IMPORTANT: keep chmod inside the same RUN or use a separate RUN
 RUN set -eux; \
     SDK_ROOT="/opt/opentelemetry-webserver-sdk"; \
     cat > "${SDK_ROOT}/install.sh" <<'EOF'
@@ -238,9 +233,6 @@ set -euo pipefail
 echo "OpenTelemetry Webserver SDK installed."
 EOF
     chmod +x "${SDK_ROOT}/install.sh"
-
-# (Alternative: you could instead do)
-# RUN chmod +x "/opt/opentelemetry-webserver-sdk/install.sh"
 
 # ---- Post-install + RPATH + sanity + re-pack ----
 RUN set -eux; \
@@ -267,6 +259,6 @@ RUN set -eux; \
     echo "==== ldd check (NGINX OTEL module) ===="; \
     ldd "/opt/opentelemetry-webserver-sdk/WebServerModule/Nginx/${NGINX_VERSION}/ngx_http_opentelemetry_module.so" || true
 
-# ---- Entrypoint (builder stage only; harmless, matches your original) ----
+# ---- Entrypoint (builder stage only) ----
 COPY entrypoint.sh /usr/local/bin/
 ENTRYPOINT ["entrypoint.sh"]
