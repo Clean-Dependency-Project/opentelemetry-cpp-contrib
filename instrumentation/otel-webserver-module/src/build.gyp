@@ -34,28 +34,16 @@
 
     'conditions': [
       ['OS=="linux"', {
+        'defines': [
+          'LOG4CXX_STATIC',
+        ],
+
         'cflags': [
           '$(COMPILER_FLAGS)',
           '-pthread -fPIC',
           '-std=c++14',
           '-g',
           '-O1 -D_FORTIFY_SOURCE=1',
-        ],
-
-        'libraries': [
-          '$(ANSDK_DIR)/apr/$(APR_VERSION)/lib/libapr-1.a',
-          '$(ANSDK_DIR)/apr-util/$(APRUTIL_VERSION)/lib/libaprutil-1.a',
-          '$(ANSDK_DIR)/expat/$(EXPAT_VERSION)/lib/libexpat.a',
-          '$(ANSDK_DIR)/apache-log4cxx/$(LOG4CXX_VERSION)/lib/liblog4cxx.a',
-          '$(ANSDK_DIR)/opentelemetry/$(CPP_SDK_VERSION)/lib/libopentelemetry_common.so',
-          '$(ANSDK_DIR)/opentelemetry/$(CPP_SDK_VERSION)/lib/libopentelemetry_resources.so',
-          '$(ANSDK_DIR)/opentelemetry/$(CPP_SDK_VERSION)/lib/libopentelemetry_trace.so',
-          '$(ANSDK_DIR)/opentelemetry/$(CPP_SDK_VERSION)/lib/libopentelemetry_otlp_recordable.so',
-          '$(ANSDK_DIR)/opentelemetry/$(CPP_SDK_VERSION)/lib/libopentelemetry_exporter_ostream_span.so',
-          '$(ANSDK_DIR)/opentelemetry/$(CPP_SDK_VERSION)/lib/libopentelemetry_exporter_otlp_grpc.so',
-          '$(BOOST_LIB)',
-          '$(LINKER_FLAGS)',
-          '$(LIBRARY_FLAGS)',
         ],
 
         'include_dirs': [
@@ -66,6 +54,24 @@
           '$(ANSDK_DIR)/opentelemetry/$(CPP_SDK_VERSION)/include/',
           '$(BOOST_INCLUDE)'
         ],
+
+        # The make/ninja generators pick libraries from link_settings.libraries
+        'link_settings': {
+          'libraries': [
+            # Order matters: log4cxx -> apr-util -> apr -> expat
+            '$(ANSDK_DIR)/apache-log4cxx/$(LOG4CXX_VERSION)/lib/liblog4cxx.a',
+            '$(ANSDK_DIR)/apr-util/$(APRUTIL_VERSION)/lib/libaprutil-1.a',
+            '$(ANSDK_DIR)/apr/$(APR_VERSION)/lib/libapr-1.a',
+            '$(ANSDK_DIR)/expat/$(EXPAT_VERSION)/lib/libexpat.a',
+
+            # Your existing flags and Boost static libs
+            '$(BOOST_LIB)',
+            '$(LINKER_FLAGS)',
+            '$(LIBRARY_FLAGS)',
+          ],
+          # Optional: if you hit circular deps between static libs, uncomment:
+          # 'ldflags': ['-Wl,--start-group', '-Wl,--end-group'],
+        },
 
         'ldflags': [
           '-Wl,--exclude-libs=ALL',
