@@ -34,12 +34,14 @@ RUN set -eux; \
     libabsl-dev libre2-dev libc-ares-dev \
     libgrpc-dev libgrpc++-dev libgrpc++1 \
     libprotobuf-dev protobuf-compiler protobuf-compiler-grpc \
-    file gnupg patchelf python3 python3-pip; \
+    file gnupg patchelf \
+    python3 python3-venv python3-pip; \
   rm -rf /var/lib/apt/lists/*
 
-# ---- Install gyp-next (Python 3 compatible) ----
+# ---- Python 3 + gyp-next in venv (PEP 668-compliant) ----
 RUN set -eux; \
-  python3 -m pip install --no-cache-dir gyp-next
+  python3 -m venv /opt/gyp-venv; \
+  /opt/gyp-venv/bin/pip install --no-cache-dir gyp-next
 
 # ---- Directory prep ----
 RUN mkdir -p /dependencies
@@ -164,13 +166,13 @@ RUN set -eux; \
 # ---- Copy module sources ----
 COPY . /otel-webserver-module
 
-# ---- Shim bundled GYP runner to gyp-next (Python 3) ----
+# ---- Shim bundled GYP runner to gyp-next (Python 3 in venv) ----
 RUN set -eux; \
   mkdir -p /otel-webserver-module/scripts/gyp/r1919; \
   cat > /otel-webserver-module/scripts/gyp/r1919/gyp <<'EOF'
 #!/usr/bin/env bash
-# shim to run Python3-compatible gyp-next
-exec python3 -m gyp_next "$@"
+# shim to run Python3-compatible gyp-next from our isolated venv
+exec /opt/gyp-venv/bin/python -m gyp_next "$@"
 EOF
 RUN chmod +x /otel-webserver-module/scripts/gyp/r1919/gyp
 
