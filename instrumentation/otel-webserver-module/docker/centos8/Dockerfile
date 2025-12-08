@@ -41,7 +41,9 @@ RUN set -eux; \
 # ---- Python 3 + gyp-next in venv (PEP 668-compliant) ----
 RUN set -eux; \
   python3 -m venv /opt/gyp-venv; \
-  /opt/gyp-venv/bin/pip install --no-cache-dir gyp-next
+  /opt/gyp-venv/bin/pip install --no-cache-dir gyp-next; \
+  # quick sanity check the module in venv
+  /opt/gyp-venv/bin/python -c "import gyp, sys; print('gyp module OK:', gyp.__file__)"
 
 # ---- Directory prep ----
 RUN mkdir -p /dependencies
@@ -172,7 +174,8 @@ RUN set -eux; \
   cat > /otel-webserver-module/scripts/gyp/r1919/gyp <<'EOF'
 #!/usr/bin/env bash
 # shim to run Python3-compatible gyp-next from our isolated venv
-exec /opt/gyp-venv/bin/python -m gyp_next "$@"
+# NOTE: gyp-next exposes the module 'gyp' (not 'gyp_next')
+exec /opt/gyp-venv/bin/python -m gyp "$@"
 EOF
 RUN chmod +x /otel-webserver-module/scripts/gyp/r1919/gyp
 
