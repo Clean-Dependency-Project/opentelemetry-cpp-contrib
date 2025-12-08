@@ -12,11 +12,13 @@ ARG NGINX_VERSION="1.29.3"
 ARG OPENTELEMETRY_VERSION="1.23.0"
 ARG BOOST_VERSION="1.75.0"
 ARG LOG4CXX_VERSION="0.11.0"
-ARG APR_VERSION="1.7.0"
+
+# NOTE: bumped APR to a Trixie-friendly release
+ARG APR_VERSION="1.7.6"          # was 1.7.0
+ARG APRUTIL_VERSION="1.6.1"
 ARG EXPAT_VERSION="2.3.0"
 ARG EXPAT_RVERSION="R_2_3_0"
 ARG LIBTOOL_VERSION="2.4.6"
-ARG APRUTIL_VERSION="1.6.1"
 ARG BOOST_FILENAME="boost_1_75_0"
 
 # Optional (pipeline parity)
@@ -40,7 +42,7 @@ RUN set -eux; \
       file gnupg patchelf; \
     rm -rf /var/lib/apt/lists/*
 
-# ---- (Optional) Build Python 2.7 to preserve original pipeline ----
+# ---- (Optional) Python 2.7 ----
 RUN set -eux; \
     wget http://www.python.org/ftp/python/${PYTHON_VERSION}/Python-${PYTHON_VERSION}.tar.xz; \
     unxz Python-${PYTHON_VERSION}.tar.xz; \
@@ -52,7 +54,7 @@ RUN set -eux; \
     cd ..; \
     rm -rf Python-${PYTHON_VERSION}.tar Python-${PYTHON_VERSION}
 
-# ---- Directory prep ----
+# ---- Dir prep ----
 RUN mkdir -p /dependencies
 
 # ---- Boost (filesystem, system) static with PIC ----
@@ -67,13 +69,17 @@ RUN set -eux; \
     rm -rf ${BOOST_FILENAME}*
 
 # ---- APR (static) ----
+# Using APR 1.7.6 from official Apache mirrors (current recommended). [3](https://apr.apache.org/download.cgi)
 RUN set -eux; \
     mkdir -p /dependencies/apr/${APR_VERSION}; \
-    wget https://archive.apache.org/dist/apr/apr-${APR_VERSION}.tar.gz --no-check-certificate; \
+    wget https://dlcdn.apache.org/apr/apr-${APR_VERSION}.tar.gz; \
     tar -xf apr-${APR_VERSION}.tar.gz; \
     cd apr-${APR_VERSION}; \
-    ./configure --prefix=/dependencies/apr/${APR_VERSION} --enable-static=yes --enable-shared=no --with-pic; \
-    make -j"$(nproc)"; make install; \
+    ./configure \
+      --prefix=/dependencies/apr/${APR_VERSION} \
+      --enable-static=yes --enable-shared=no --with-pic; \
+    make -j"$(nproc)"; \
+    make install; \
     cd ..; rm -rf apr-${APR_VERSION}*
 
 # ---- Expat (static) ----
