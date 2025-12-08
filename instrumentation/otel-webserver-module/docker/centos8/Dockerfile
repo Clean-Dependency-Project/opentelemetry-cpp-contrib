@@ -48,22 +48,28 @@ RUN set -eux; \
   wget http://www.python.org/ftp/python/${PYTHON_VERSION}/Python-${PYTHON_VERSION}.tar.xz; \
   tar -xf Python-${PYTHON_VERSION}.tar.xz
 
-# ---- Force-build math & cmath; patch for glibc sinpi/cospi/tanpi collision ----
+# ---- Force-build math & cmath (no heredoc to avoid parser issues) ----
 RUN set -eux; \
-  # Ensure math/cmath get built as part of Python
-  cat > Python-${PYTHON_VERSION}/Modules/Setup.local <<'EOF'
-# Force build of math and cmath (linking with libm)
-math   mathmodule.c   -lm
-cmath  cmathmodule.c  -lm
-EOF
-  # Macro-remap identifiers to private names to avoid glibc <math.h> conflicts (glibc 2.41 adds C23 trig functions)
-  sed -i '/#include "Python.h"/a\
-#if defined(__GLIBC__)\
-#define sinpi _Py_sinpi\
-#define cospi _Py_cospi\
-#define tanpi _Py_tanpi\
-#endif' Python-${PYTHON_VERSION}/Modules/mathmodule.c \
-  && grep -n 'sinpi' Python-${PYTHON_VERSION}/Modules/mathmodule.c
+  printf '%s\n' \
+    '# Force build of math and cmath (linking with libm)' \
+    'math   mathmodule.c   -lm' \
+    'cmath  cmathmodule.c  -lm' \
+    > Python-${PYTHON_VERSION}/Modules/Setup.local
+
+# ---- Patch for glibc sinpi/cospi/tanpi collision (glibc 2.41 adds C23 trig funcs)
+#      Insert macro remaps immediately after #include "Python.h"
+RUN set -eux; \
+  awk '1; /#include "Python.h"/ { \
+          print "#if defined(__GLIBC__)"; \
+          print "#define sinpi _Py_sinpi"; \
+          print "#define cospi _Py_cospi"; \
+          print "#define tanpi _Py_tanpi"; \
+          print "#endif" }' \
+      Python-${PYTHON_VERSION}/Modules/mathmodule.c \
+    > Python-${PYTHON_VERSION}/Modules/mathmodule.c.patched && \
+  mv Python-${PYTHON_VERSION}/Modules/mathmodule.c.patched \
+     Python-${PYTHON_VERSION}/Modules/mathmodule.c && \
+  grep -n 'sinpi' Python-${PYTHON_VERSION}/Modules/mathmodule.c
 
 # ---- Build + install Python 2.7 ----
 RUN set -eux; \
