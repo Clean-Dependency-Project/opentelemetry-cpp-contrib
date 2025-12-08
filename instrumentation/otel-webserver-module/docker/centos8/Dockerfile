@@ -151,7 +151,7 @@ RUN set -eux; \
     cmake --install .; \
     find . -type f -name "*.so" -exec cp -v {} /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/lib/ \;; \
     cd ../..; \
-    # ---- Discover and copy generated proto headers (single-line, inside RUN) ----
+    # ---- Discover and copy generated proto headers (single-line inside RUN) ----
     PROTO_ROOT_DIR="$(find /opentelemetry-cpp -type f -path '*/opentelemetry/proto/*/*.pb.h' -printf '%h\n' | sed -E 's#^(.*opentelemetry/proto).*#\1#' | head -n 1)"; \
     if [ -n "${PROTO_ROOT_DIR}" ] && [ -d "${PROTO_ROOT_DIR}" ]; then \
       echo "Discovered proto root: ${PROTO_ROOT_DIR}"; \
@@ -232,7 +232,9 @@ set -euo pipefail
 # No global ldconfig; module relies on $ORIGIN-based RPATH.
 echo "OpenTelemetry Webserver SDK installed."
 EOF
-    chmod +x "${SDK_ROOT}/install.sh"
+
+# Make the script executable (separate RUN to avoid heredoc parsing issues)
+RUN chmod +x "/opt/opentelemetry-webserver-sdk/install.sh"
 
 # ---- Post-install + RPATH + sanity + re-pack ----
 RUN set -eux; \
