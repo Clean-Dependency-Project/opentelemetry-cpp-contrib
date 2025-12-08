@@ -13,7 +13,7 @@ ARG OPENTELEMETRY_VERSION="1.23.0"
 ARG BOOST_VERSION="1.75.0"
 ARG LOG4CXX_VERSION="0.11.0"
 
-# IMPORTANT: keep APR modern for Trixie toolchains
+# IMPORTANT: modern APR for Trixie toolchains
 ARG APR_VERSION="1.7.6"
 ARG APRUTIL_VERSION="1.6.1"
 ARG EXPAT_VERSION="2.3.0"
@@ -46,7 +46,7 @@ RUN set -eux; \
       libncursesw5-dev libgdbm-dev uuid-dev; \
     rm -rf /var/lib/apt/lists/*
 
-# ---- (Optional) Build Python 2.7 for GYP; ensure extension modules exist ----
+# ---- Build Python 2.7 for GYP; ensure extension modules exist ----
 RUN set -eux; \
     wget http://www.python.org/ftp/python/${PYTHON_VERSION}/Python-${PYTHON_VERSION}.tar.xz; \
     tar -xf Python-${PYTHON_VERSION}.tar.xz; \
@@ -56,14 +56,16 @@ RUN set -eux; \
     make install; \
     ldconfig; \
     # Ensure 'python' resolves to python2.7 for legacy GYP invocations
-    ln -sf /usr/local/bin/python2.7 /usr/local/bin/python; \
-    # Sanity-check that critical extension modules load
+    ln -sf /usr/local/bin/python2.7 /usr/local/bin/python
+
+# ---- Python 2.7 sanity-check + cleanup (separate RUN to avoid heredoc parse issues) ----
+RUN set -eux; \
     python2.7 - <<'PY'
 import sys; print("Python:", sys.version)
 import math, tempfile, random
 print("python2.7 OK: math/tempfile/random importable")
 PY
-    cd ..; \
+    ; \
     rm -rf Python-${PYTHON_VERSION} Python-${PYTHON_VERSION}.tar.xz
 
 # ---- Directory prep ----
@@ -81,8 +83,6 @@ RUN set -eux; \
     rm -rf ${BOOST_FILENAME}*
 
 # ---- APR (static) ----
-# Use APR 1.7.6 recommended release to avoid build issues on modern distros.
-# Official mirrors provide apr-1.7.6. [2](https://forums.raspberrypi.com/viewtopic.php?t=369682)
 RUN set -eux; \
     mkdir -p /dependencies/apr/${APR_VERSION}; \
     wget https://dlcdn.apache.org/apr/apr-${APR_VERSION}.tar.gz; \
