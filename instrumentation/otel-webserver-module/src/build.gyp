@@ -4,8 +4,10 @@
     'target_name': 'opentelemetry_webserver_sdk',
     'type': 'shared_library',
 
+    # Common defines
     'defines': ['TIMER_USE_CGT'],
 
+    # macOS/Xcode block retained for parity
     'xcode_settings': {
       'OTHER_CFLAGS': [
         '-std=c++14',
@@ -16,6 +18,7 @@
       'OTHER_LDFLAGS': ['-lpthread -ldl -lz -stdlib=libstdc++']
     },
 
+    # Project sources
     'sources': [
       'core/api/WSAgent.cpp',
       'core/api/RequestProcessingEngine.cpp',
@@ -33,53 +36,71 @@
     ],
 
     'conditions': [
+      # ============================
+      # Linux
+      # ============================
       ['OS=="linux"', {
         'defines': [
-          'LOG4CXX_STATIC',
+          'LOG4CXX_STATIC',   # static log4cxx build
         ],
 
         'cflags': [
           '$(COMPILER_FLAGS)',
-          '-pthread -fPIC',
+          '-pthread',
+          '-fPIC',
           '-std=c++14',
           '-g',
-          '-O1 -D_FORTIFY_SOURCE=1',
+          '-O1',
+          '-D_FORTIFY_SOURCE=1',
         ],
 
+        # Headers
         'include_dirs': [
           '../linux-fixed-headers',
           '$(ANSDK_DIR)/apache-log4cxx/$(LOG4CXX_VERSION)/include',
           '../include/util',
           '../include/core',
           '$(ANSDK_DIR)/opentelemetry/$(CPP_SDK_VERSION)/include/',
-          '$(BOOST_INCLUDE)'
+          '$(BOOST_INCLUDE)',
         ],
 
-        # The make/ninja generators pick libraries from link_settings.libraries
+        # Library search paths -> translated to -L...
+        'library_dirs': [
+          '$(ANSDK_DIR)/apache-log4cxx/$(LOG4CXX_VERSION)/lib',
+          '$(ANSDK_DIR)/apr-util/$(APRUTIL_VERSION)/lib',
+          '$(ANSDK_DIR)/apr/$(APR_VERSION)/lib',
+          '$(ANSDK_DIR)/expat/$(EXPAT_VERSION)/lib',
+        ],
+
+        # Final link settings (order matters). Use -l names so -L dirs apply.
         'link_settings': {
           'libraries': [
-            # Order matters: log4cxx -> apr-util -> apr -> expat
-            '$(ANSDK_DIR)/apache-log4cxx/$(LOG4CXX_VERSION)/lib/liblog4cxx.a',
-            '$(ANSDK_DIR)/apr-util/$(APRUTIL_VERSION)/lib/libaprutil-1.a',
-            '$(ANSDK_DIR)/apr/$(APR_VERSION)/lib/libapr-1.a',
-            '$(ANSDK_DIR)/expat/$(EXPAT_VERSION)/lib/libexpat.a',
+            # Resolve static libs with grouping to handle mutual references
+            '-Wl,--start-group',
+            '-llog4cxx',
+            '-laprutil-1',
+            '-lapr-1',
+            '-lexpat',
+            '-Wl,--end-group',
 
-            # Your existing flags and Boost static libs
+            # Your existing Boost static libs and flags
             '$(BOOST_LIB)',
             '$(LINKER_FLAGS)',
             '$(LIBRARY_FLAGS)',
           ],
-          # Optional: if you hit circular deps between static libs, uncomment:
-          # 'ldflags': ['-Wl,--start-group', '-Wl,--end-group'],
         },
 
+        # Additional linker flags
         'ldflags': [
           '-Wl,--exclude-libs=ALL',
           '-Wl,--gc-sections',
           '-Wl,-z,defs',
-        ]
+        ],
       }],
 
+      # ============================
+      # Windows (unchanged from your file)
+      # ============================
       ['OS=="win"', {
         'default_configuration': 'Debug_x64',
         'configurations': {

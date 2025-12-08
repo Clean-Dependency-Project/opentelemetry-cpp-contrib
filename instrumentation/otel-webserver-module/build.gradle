@@ -165,6 +165,7 @@ task gypLibrary(type: Exec) {
             "build.gyp"
 }
 
+
 // ---- Compile the SDK library using generated Makefiles ----
 task buildLibrary(type: Exec) {
     group = 'SDK Library'
@@ -178,9 +179,13 @@ task buildLibrary(type: Exec) {
     // Use same environment as gypLibrary (contains PATH + versions)
     environment gypLibrary.libraryBuildEnvironment
 
+    // Optional sanity (static libs do not need this; OK to omit)
+    // environment "LD_LIBRARY_PATH", "${modDepDir}/apache-log4cxx/${LOG4CXX_VERSION}/lib:${modDepDir}/apr/${APR_VERSION}/lib:${modDepDir}/apr-util/${APRUTIL_VERSION}/lib:${modDepDir}/expat/${EXPAT_VERSION}/lib:${System.getenv('LD_LIBRARY_PATH') ?: ''}"
+
     workingDir "${platBuildDir}"
     commandLine 'make', 'V=1', '-j', Runtime.runtime.availableProcessors().toString()
 }
+
 
 // ---- Stage SDK ----
 task stageLibrary(type: Copy) {
