@@ -70,17 +70,30 @@
           '$(ANSDK_DIR)/apr-util/$(APRUTIL_VERSION)/lib',
           '$(ANSDK_DIR)/apr/$(APR_VERSION)/lib',
           '$(ANSDK_DIR)/expat/$(EXPAT_VERSION)/lib',
+          # OpenTelemetry C++ SDK libs
+          '$(ANSDK_DIR)/opentelemetry/$(CPP_SDK_VERSION)/lib',
         ],
 
-        # Final link settings (order matters). Use -l names so -L dirs apply.
+        # Final link settings (order matters).
         'link_settings': {
           'libraries': [
-            # Resolve static libs with grouping to handle mutual references
+            # --- Static libs (use a group to resolve mutual refs)
             '-Wl,--start-group',
             '-llog4cxx',
             '-laprutil-1',
             '-lapr-1',
             '-lexpat',
+            '-Wl,--end-group',
+
+            # --- OpenTelemetry SDK shared libs used by your code
+            # TracerProvider, BatchSpanProcessor, RandomIdGenerator, Resource::Create, etc.
+            '-Wl,--start-group',
+            '-lopentelemetry_common',
+            '-lopentelemetry_resources',
+            '-lopentelemetry_trace',
+            '-lopentelemetry_otlp_recordable',
+            '-lopentelemetry_exporter_ostream_span',
+            '-lopentelemetry_exporter_otlp_grpc',
             '-Wl,--end-group',
 
             # Your existing Boost static libs and flags
