@@ -46,11 +46,18 @@ RUN set -eux; \
       libncursesw5-dev libgdbm-dev uuid-dev; \
     rm -rf /var/lib/apt/lists/*
 
-# ---- Build Python 2.7 for GYP; ensure extension modules exist ----
+# ---- Build Python 2.7 for GYP; force-build math & cmath extension modules ----
 RUN set -eux; \
     wget http://www.python.org/ftp/python/${PYTHON_VERSION}/Python-${PYTHON_VERSION}.tar.xz; \
     tar -xf Python-${PYTHON_VERSION}.tar.xz; \
     cd Python-${PYTHON_VERSION}; \
+    # Force-build required extension modules so imports never fail
+    # (built-in or shared works; here we build as built-ins for certainty)
+    cat > Modules/Setup.local <<'EOF'
+# Force build of math and cmath (require libm)
+math   mathmodule.c   -lm
+cmath  cmathmodule.c  -lm
+EOF
     ./configure --prefix=/usr/local --enable-shared; \
     make -j"$(nproc)"; \
     make install; \
