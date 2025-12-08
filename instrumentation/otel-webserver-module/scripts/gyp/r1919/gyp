@@ -1,4 +1,4 @@
 
 #!/usr/bin/env bash
-# shim to run Python3-compatible gyp-next
-exec python3 -m gyp_next "$@"
+# Run gyp-next console script from our isolated venv
+exec /opt/gyp-venv/bin/gyp "$@"

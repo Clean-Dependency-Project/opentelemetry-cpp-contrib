@@ -1,8 +1,8 @@
 
 # syntax=docker/dockerfile:1.4
-############################################################
+###############################################
 # Stage: BUILD on Debian 13 (Trixie)
-############################################################
+###############################################
 FROM debian:trixie-slim AS builder
 ARG BUILD_NUMBER
 LABEL NAME="apm/build-image-nginx-otel-debian13-x64" VERSION=${BUILD_NUMBER}
@@ -18,7 +18,6 @@ ARG EXPAT_VERSION="2.3.0"
 ARG EXPAT_RVERSION="R_2_3_0"
 ARG LIBTOOL_VERSION="2.4.6"
 ARG BOOST_FILENAME="boost_1_75_0"
-
 ENV DEBIAN_FRONTEND=noninteractive
 ENV LANG=C.UTF-8
 
@@ -38,12 +37,11 @@ RUN set -eux; \
     python3 python3-venv python3-pip; \
   rm -rf /var/lib/apt/lists/*
 
-# ---- Python 3 + gyp-next in venv (PEP 668-compliant) ----
+# ---- Python 3 + gyp-next in venv ----
 RUN set -eux; \
   python3 -m venv /opt/gyp-venv; \
   /opt/gyp-venv/bin/pip install --no-cache-dir gyp-next; \
-  # quick sanity check the module in venv
-  /opt/gyp-venv/bin/python -c "import gyp, sys; print('gyp module OK:', gyp.__file__)"
+  /opt/gyp-venv/bin/python -c "import gyp; print('gyp module OK:', gyp.__file__)"
 
 # ---- Directory prep ----
 RUN mkdir -p /dependencies
@@ -145,7 +143,8 @@ RUN set -eux; \
   cmake --install .; \
   find . -type f -name "*.so" -exec cp -v {} /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/lib/ \;; \
   cd ../..; \
-  PROTO_ROOT_DIR="$(find /opentelemetry-cpp -type f -path '*/opentelemetry/proto/*/*.pb.h' -printf '%h\n' | sed -E 's#^(.*opentelemetry/proto).*#\1#' | head -n 1)"; \
+  PROTO_ROOT_DIR="$(find /opentelemetry-cpp -type f -path '*/opentelemetry/proto/*/*.pb.h' -printf '%h\n' \
+    | sed -E 's#^(.*opentelemetry/proto).*#\1#' | head -n 1)"; \
   if [ -n "${PROTO_ROOT_DIR}" ] && [ -d "${PROTO_ROOT_DIR}" ]; then \
     echo "Discovered proto root: ${PROTO_ROOT_DIR}"; \
     mkdir -p /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/include/opentelemetry/; \
@@ -168,24 +167,24 @@ RUN set -eux; \
 # ---- Copy module sources ----
 COPY . /otel-webserver-module
 
-# ---- Shim bundled GYP runner to gyp-next (Python 3 in venv) ----
+# ---- Shim bundled GYP runner to gyp-next console script ----
 RUN set -eux; \
   mkdir -p /otel-webserver-module/scripts/gyp/r1919; \
   cat > /otel-webserver-module/scripts/gyp/r1919/gyp <<'EOF'
 #!/usr/bin/env bash
-# shim to run Python3-compatible gyp-next from our isolated venv
-# NOTE: gyp-next exposes the module 'gyp' (not 'gyp_next')
-exec /opt/gyp-venv/bin/python -m gyp "$@"
+# Run gyp-next console script from our isolated venv
+exec /opt/gyp-venv/bin/gyp "$@"
 EOF
 RUN chmod +x /otel-webserver-module/scripts/gyp/r1919/gyp
 
-# ---- Build (force PYTHON=python3 so any env checks prefer it) ----
+# ---- Build (use venv; keep PATH consistent) ----
 RUN set -eux; \
   cp -r /dependencies /otel-webserver-module/; \
   cp -r /build-dependencies /otel-webserver-module/; \
   cd /otel-webserver-module; \
   chmod +x ./gradlew; \
-  env PYTHON=/usr/bin/python3 ./gradlew assembleWebServerModule
+  export PATH="/opt/gyp-venv/bin:${PATH}"; \
+  ./gradlew assembleWebServerModule --info
 
 # ---- Unpack SDK & augment (exclude core + OpenSSL) ----
 RUN set -eux; \
@@ -212,7 +211,18 @@ RUN set -eux; \
       ldd "${LIB}" \
         | awk '/=>/ && $3 ~ /^\// {print $3} !/=>/ {for(i=1;i<=NF;i++) if($i ~ /^\//) print $i}' \
         | sort -u \
-        | grep -Ev '/ld-linux-x86-64\.so\.2$|/libc\.so\.6$|/libm\.so\.6$|/libpthread\.so\.[0-9]+$|/libdl\.so\.[0-9]+$|/librt\.so\.[0-9]+$|/libresolv\.so\.[0-9]+$|/libnsl\.so\.[0-9]+$|/libgcc_s\.so\.[0-9]+$|/libstdc\+\+\.so\.[0-9]+$|/libssl\.so\.[0-9]+$|/libcrypto\.so\.[0-9]+$' \
+        | grep -Ev '/ld-linux-x86-64\.so\.2$\
+/libc\.so\.6$\
+/libm\.so\.6$\
+/libpthread\.so\.[0-9]+$\
+/libdl\.so\.[0-9]+$\
+/librt\.so\.[0-9]+$\
+/libresolv\.so\.[0-9]+$\
+/libnsl\.so\.[0-9]+$\
+/libgcc_s\.so\.[0-9]+$\
+/libstdc\+\+\.so\.[0-9]+$\
+/libssl\.so\.[0-9]+$\
+/libcrypto\.so\.[0-9]+$' \
         | xargs -r -I{} cp -v {} "${TP_LIB_DIR}/"; \
     fi; \
   done; \
@@ -220,7 +230,8 @@ RUN set -eux; \
     ln -sv "${TP_LIB_DIR}/libgrpc++.so.1.51.1" "${TP_LIB_DIR}/libgrpc++.so.1.51"; \
   fi; \
   if ls "${TP_LIB_DIR}"/libprotobuf.so.32* >/dev/null 2>&1; then \
-    [ -f "${TP_LIB_DIR}/libprotobuf.so.32" ] || ln -sv "$(ls -1 ${TP_LIB_DIR}/libprotobuf.so.32* | head -n1)" "${TP_LIB_DIR}/libprotobuf.so.32"; \
+    [ -f "${TP_LIB_DIR}/libprotobuf.so.32" ] || \
+      ln -sv "$(ls -1 ${TP_LIB_DIR}/libprotobuf.so.32* | head -n1)" "${TP_LIB_DIR}/libprotobuf.so.32"; \
   fi
 
 # ---- Create installer (keep $ORIGIN RPATH; no global ldconfig) ----
@@ -243,8 +254,8 @@ RUN set -eux; \
     "${SDK_ROOT}/WebServerModule/Nginx/${NGINX_VERSION}/ngx_http_opentelemetry_module.so"; \
   patchelf --print-rpath \
     "${SDK_ROOT}/WebServerModule/Nginx/${NGINX_VERSION}/ngx_http_opentelemetry_module.so"; \
-  test -f "${SDK_LIB_DIR}/libopentelemetry_exporter_otlp_grpc_client.so" \
-    || (echo "ERROR: missing libopentelemetry_exporter_otlp_grpc_client.so in ${SDK_LIB_DIR}" && ls -l "${SDK_LIB_DIR}" && exit 1); \
+  test -f "${SDK_LIB_DIR}/libopentelemetry_exporter_otlp_grpc_client.so" || \
+    (echo "ERROR: missing libopentelemetry_exporter_otlp_grpc_client.so in ${SDK_LIB_DIR}" && ls -l "${SDK_LIB_DIR}" && exit 1); \
   cd "${SDK_ROOT}/.."; \
   mkdir -p /otel-webserver-module/build; \
   tar -czf /otel-webserver-module/build/opentelemetry-webserver-sdk-x64-linux.tgz \
