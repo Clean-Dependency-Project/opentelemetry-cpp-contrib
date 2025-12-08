@@ -49,22 +49,21 @@ RUN set -eux; \
   tar -xf Python-${PYTHON_VERSION}.tar.xz
 
 # ---- Force-build math & cmath; patch for glibc sinpi/cospi/tanpi collision ----
-# glibc 2.41 adds sinpi/cospi/tanpi prototypes to <math.h> (C23),
-# which clashes with CPython 2.7's internal helpers. Remap to private names. [1](https://www.phoronix.com/news/Glibc-2.41-More-C23)[2](https://lists.gnu.org/archive/html/info-gnu/2025-01/msg00014.html)
 RUN set -eux; \
-  # Ensure math/cmath get built
+  # Ensure math/cmath get built as part of Python
   cat > Python-${PYTHON_VERSION}/Modules/Setup.local <<'EOF'
 # Force build of math and cmath (linking with libm)
 math   mathmodule.c   -lm
 cmath  cmathmodule.c  -lm
 EOF
-  # Macro-remap identifiers to private names to avoid glibc <math.h> conflicts
+  # Macro-remap identifiers to private names to avoid glibc <math.h> conflicts (glibc 2.41 adds C23 trig functions)
   sed -i '/#include "Python.h"/a\
 #if defined(__GLIBC__)\
 #define sinpi _Py_sinpi\
 #define cospi _Py_cospi\
 #define tanpi _Py_tanpi\
-#endif' Python-${PYTHON_VERSION}/Modules/mathmodule.c
+#endif' Python-${PYTHON_VERSION}/Modules/mathmodule.c \
+  && grep -n 'sinpi' Python-${PYTHON_VERSION}/Modules/mathmodule.c
 
 # ---- Build + install Python 2.7 ----
 RUN set -eux; \
