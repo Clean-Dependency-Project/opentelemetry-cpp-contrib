@@ -12,20 +12,17 @@ ARG NGINX_VERSION="1.29.3"
 ARG OPENTELEMETRY_VERSION="1.23.0"
 ARG BOOST_VERSION="1.75.0"
 ARG LOG4CXX_VERSION="0.11.0"
-ARG APR_VERSION="1.7.6"               # modern APR for Trixie
+ARG APR_VERSION="1.7.6"
 ARG APRUTIL_VERSION="1.6.1"
 ARG EXPAT_VERSION="2.3.0"
 ARG EXPAT_RVERSION="R_2_3_0"
 ARG LIBTOOL_VERSION="2.4.6"
 ARG BOOST_FILENAME="boost_1_75_0"
 
-# Python 2.7 for GYP
-ARG PYTHON_VERSION="2.7.8"
-
 ENV DEBIAN_FRONTEND=noninteractive
 ENV LANG=C.UTF-8
 
-# ---- Toolchain & build deps (Trixie-compatible) ----
+# ---- Toolchain & base build deps ----
 RUN set -eux; \
   apt-get update; \
   apt-get install -y --no-install-recommends \
@@ -37,70 +34,12 @@ RUN set -eux; \
     libabsl-dev libre2-dev libc-ares-dev \
     libgrpc-dev libgrpc++-dev libgrpc++1 \
     libprotobuf-dev protobuf-compiler protobuf-compiler-grpc \
-    file gnupg patchelf \
-    # Python 2.7 build deps
-    libbz2-dev libreadline-dev libsqlite3-dev libffi-dev \
-    libncursesw5-dev libgdbm-dev uuid-dev; \
+    file gnupg patchelf python3 python3-pip; \
   rm -rf /var/lib/apt/lists/*
 
-# ---- Fetch & unpack Python 2.7 sources ----
+# ---- Install gyp-next (Python 3 compatible) ----
 RUN set -eux; \
-  wget http://www.python.org/ftp/python/${PYTHON_VERSION}/Python-${PYTHON_VERSION}.tar.xz; \
-  tar -xf Python-${PYTHON_VERSION}.tar.xz
-
-# ---- Force-build math & cmath (no heredoc) ----
-RUN set -eux; \
-  printf '%s\n' \
-    '# Force build of math and cmath (linking with libm)' \
-    'math   mathmodule.c   -lm' \
-    'cmath  cmathmodule.c  -lm' \
-    > Python-${PYTHON_VERSION}/Modules/Setup.local
-
-# ---- Patch glibc collisions + map missing wrappers to libc (C99) ----
-# glibc 2.41: sinpi/cospi/tanpi added in <math.h> (C23) – avoid name collision.
-# Also map CPython's _Py_log1p/_Py_expm1 to libc log1p/expm1 so linking never misses them.
-RUN set -eux; \
-  awk ' \
-    /#include "Python.h"/ { \
-      print; \
-      print "#if defined(__GLIBC__)"; \
-      print "#define sinpi _Py_sinpi"; \
-      print "#define cospi _Py_cospi"; \
-      print "#define tanpi _Py_tanpi"; \
-      print "#define _Py_log1p log1p"; \
-      print "#define _Py_expm1 expm1"; \
-      print "#endif"; \
-      next \
-    } \
-    { print }' \
-    Python-${PYTHON_VERSION}/Modules/mathmodule.c \
-    > Python-${PYTHON_VERSION}/Modules/mathmodule.c.patched && \
-  mv Python-${PYTHON_VERSION}/Modules/mathmodule.c.patched \
-     Python-${PYTHON_VERSION}/Modules/mathmodule.c && \
-  grep -n -E 'sinpi|_Py_log1p|_Py_expm1' Python-${PYTHON_VERSION}/Modules/mathmodule.c
-
-# ---- Build + install Python 2.7 ----
-RUN set -eux; \
-  ( \
-    cd Python-${PYTHON_VERSION} && \
-    CPPFLAGS="-D_GNU_SOURCE" ./configure --prefix=/usr/local --enable-shared && \
-    make -j"$(nproc)" && \
-    make install \
-  ); \
-  ldconfig; \
-  ln -sf /usr/local/bin/python2.7 /usr/local/bin/python
-
-# ---- Sanity-check Python 2.7 ----
-RUN set -eux; \
-  python2.7 - <<'PY'
-import sys; print("Python:", sys.version)
-import math, tempfile, random
-print("python2.7 OK: math/tempfile/random importable")
-PY
-
-# ---- Cleanup Python sources ----
-RUN set -eux; \
-  rm -rf Python-${PYTHON_VERSION} Python-${PYTHON_VERSION}.tar.xz
+  python3 -m pip install --no-cache-dir gyp-next
 
 # ---- Directory prep ----
 RUN mkdir -p /dependencies
@@ -222,14 +161,26 @@ RUN set -eux; \
   tar -xvf nginx-${NGINX_VERSION}.tar.gz -C /build-dependencies; \
   rm -f nginx-${NGINX_VERSION}.tar.gz
 
-# ---- Copy module sources & build (force GYP to use python2.7) ----
+# ---- Copy module sources ----
 COPY . /otel-webserver-module
+
+# ---- Shim bundled GYP runner to gyp-next (Python 3) ----
+RUN set -eux; \
+  mkdir -p /otel-webserver-module/scripts/gyp/r1919; \
+  cat > /otel-webserver-module/scripts/gyp/r1919/gyp <<'EOF'
+#!/usr/bin/env bash
+# shim to run Python3-compatible gyp-next
+exec python3 -m gyp_next "$@"
+EOF
+RUN chmod +x /otel-webserver-module/scripts/gyp/r1919/gyp
+
+# ---- Build (force PYTHON=python3 so any env checks prefer it) ----
 RUN set -eux; \
   cp -r /dependencies /otel-webserver-module/; \
   cp -r /build-dependencies /otel-webserver-module/; \
   cd /otel-webserver-module; \
   chmod +x ./gradlew; \
-  env PYTHON=/usr/local/bin/python2.7 ./gradlew assembleWebServerModule
+  env PYTHON=/usr/bin/python3 ./gradlew assembleWebServerModule
 
 # ---- Unpack SDK & augment (exclude core + OpenSSL) ----
 RUN set -eux; \
@@ -276,7 +227,6 @@ set -euo pipefail
 # No global ldconfig; module relies on $ORIGIN-based RPATH.
 echo "OpenTelemetry Webserver SDK installed."
 EOF
-
 RUN chmod +x "/opt/opentelemetry-webserver-sdk/install.sh"
 
 # ---- Post-install + RPATH + sanity + re-pack ----
