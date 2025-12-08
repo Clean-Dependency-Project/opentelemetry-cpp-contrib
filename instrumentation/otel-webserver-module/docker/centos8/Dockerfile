@@ -25,14 +25,14 @@ ARG PYTHON_VERSION="2.7.8"
 ENV DEBIAN_FRONTEND=noninteractive
 ENV LANG=C.UTF-8
 
-# ---- Toolchain & build deps ----
+# ---- Toolchain & build deps (Trixie-compatible) ----
 RUN set -eux; \
     apt-get update; \
     apt-get install -y --no-install-recommends \
       build-essential git make wget curl ca-certificates xz-utils tar unzip which \
       cmake pkg-config ninja-build \
-      zlib1g-dev libssl-dev libpcre3-dev \
-      openjdk-17-jdk \
+      zlib1g-dev libssl-dev libpcre2-dev \
+      default-jdk \
       perl m4 autoconf automake libtool \
       libabsl-dev libre2-dev libc-ares-dev \
       libgrpc-dev libgrpc++-dev libgrpc++1 \
@@ -40,7 +40,7 @@ RUN set -eux; \
       file gnupg patchelf; \
     rm -rf /var/lib/apt/lists/*
 
-# ---- (Optional) Python 2.7 ----
+# ---- (Optional) Build Python 2.7 to preserve original pipeline ----
 RUN set -eux; \
     wget http://www.python.org/ftp/python/${PYTHON_VERSION}/Python-${PYTHON_VERSION}.tar.xz; \
     unxz Python-${PYTHON_VERSION}.tar.xz; \
@@ -52,7 +52,7 @@ RUN set -eux; \
     cd ..; \
     rm -rf Python-${PYTHON_VERSION}.tar Python-${PYTHON_VERSION}
 
-# ---- Dir prep ----
+# ---- Directory prep ----
 RUN mkdir -p /dependencies
 
 # ---- Boost (filesystem, system) static with PIC ----
