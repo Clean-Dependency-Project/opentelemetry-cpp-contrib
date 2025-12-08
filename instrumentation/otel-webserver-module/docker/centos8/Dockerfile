@@ -2,7 +2,7 @@
 # syntax=docker/dockerfile:1.4
 
 ###############################################
-# Stage 1: BUILD on Debian 13 (Trixie)
+# Stage: BUILD on Debian 13 (Trixie)
 ###############################################
 FROM debian:trixie-slim AS builder
 ARG BUILD_NUMBER
@@ -150,37 +150,23 @@ RUN set -eux; \
   cmake --build . --target all -j"$(nproc)"; \
   cmake --install .; \
   find . -type f -name "*.so" -exec cp -v {} /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/lib/ \; ; \
-  cd ../..
-
-# ---- Discover and copy generated proto headers (helper script)
-RUN set -eux; \
-  cat > /tmp/copy_proto.sh <<'EOF'
-#!/usr/bin/env bash
-set -euo pipefail
-PROTO_ROOT_DIR="$(
-  find . -type f -path '*/opentelemetry/proto/*/*.pb.h' -printf '%h\n' | \
-  sed -E 's#^(.*opentelemetry/proto).*#\1#' | \
-  head -n 1
-)"
-if [[ -n "${PROTO_ROOT_DIR}" ]] && [[ -d "${PROTO_ROOT_DIR}" ]]; then
-  echo "Discovered proto root: ${PROTO_ROOT_DIR}"
-  mkdir -p "/dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/include/opentelemetry/"
-  cp -r "${PROTO_ROOT_DIR}" "/dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/include/opentelemetry/"
-else
-  echo "ERROR: Could not locate generated opentelemetry/proto/*.pb.h in build tree." >&2
-  find . -type f -name '*.pb.h' | sed 's/^/ /'
-  exit 1
-fi
-test -f "/dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/include/opentelemetry/proto/trace/v1/trace.pb.h"
-EOF
-  chmod +x /tmp/copy_proto.sh
-
-# Execute the helper against the opentelemetry-cpp tree and clean up
-RUN set -eux; \
-  cd /opentelemetry-cpp; \
-  /tmp/copy_proto.sh; \
-  cd /; \
-  rm -f /tmp/copy_proto.sh; \
+  cd ../..; \
+  # ---- Discover and copy generated proto headers (inline; no heredoc) ----
+  PROTO_ROOT_DIR="$( \
+    find /opentelemetry-cpp -type f -path '*/opentelemetry/proto/*/*.pb.h' -printf '%h\n' | \
+    sed -E 's#^(.*opentelemetry/proto).*#\1#' | \
+    head -n 1 \
+  )"; \
+  if [ -n "${PROTO_ROOT_DIR}" ] && [ -d "${PROTO_ROOT_DIR}" ]; then \
+    echo "Discovered proto root: ${PROTO_ROOT_DIR}"; \
+    mkdir -p /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/include/opentelemetry/; \
+    cp -r "${PROTO_ROOT_DIR}" /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/include/opentelemetry/; \
+  else \
+    echo "ERROR: Could not locate generated opentelemetry/proto/*.pb.h in build tree." >&2; \
+    find /opentelemetry-cpp -type f -name '*.pb.h' | sed 's/^/ /'; \
+    exit 1; \
+  fi; \
+  test -f /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/include/opentelemetry/proto/trace/v1/trace.pb.h; \
   rm -rf /opentelemetry-cpp
 
 # ---- NGINX source headers (for module build) ----
@@ -277,36 +263,6 @@ RUN set -eux; \
   echo "==== ldd check (NGINX OTEL module) ===="; \
   ldd "/opt/opentelemetry-webserver-sdk/WebServerModule/Nginx/${NGINX_VERSION}/ngx_http_opentelemetry_module.so" || true
 
-
-###############################################
-# (Optional) Stage 2: RUNTIME smoke test
-#   Loads the Trixie-built module into your base NGINX 1.29.3 image
-###############################################
-FROM artifactory.fanniemae.com/fnm-vtm-staging-release/nginx:${NGINX_VERSION} AS runtime
-USER root
-
-# Bring in the freshly-built SDK tarball
-COPY --from=builder /otel-webserver-module/build/opentelemetry-webserver-sdk-x64-linux.tgz /opt/
-
-# Install the SDK and load the module once
-RUN set -eux; \
-  cd /opt; \
-  tar -zvxf opentelemetry-webserver-sdk-x64-linux.tgz; \
-  rm -f opentelemetry-webserver-sdk-x64-linux.tgz; \
-  /opt/opentelemetry-webserver-sdk/install.sh; \
-  # Insert load_module only if installer didn't add it
-  if ! grep -q 'ngx_http_opentelemetry_module.so' /etc/nginx/nginx.conf; then \
-    sed -i '1iload_module /opt/opentelemetry-webserver-sdk/WebServerModule/Nginx/1.29.3/ngx_http_opentelemetry_module.so;' /etc/nginx/nginx.conf; \
-  fi; \
-  chmod -R a+rX /opt/opentelemetry-webserver-sdk; \
-  nginx -t
-
-# Minimal otel.conf: start stable, then switch to OTLP in your deployment
-RUN printf '%s\n' \
-  'NginxModuleEnabled ON;' \
-  'NginxModuleOtelSpanExporter ostream;' \
-  'NginxModuleServiceName nginx;' \
-  'NginxModuleServiceNamespace default;' \
-  > /etc/nginx/conf.d/otel.conf
-
-CMD ["nginx", "-g", "daemon off;"]
+# ---- Entrypoint (builder stage only; harmless, matches your original) ----
+COPY entrypoint.sh /usr/local/bin/
+ENTRYPOINT ["entrypoint.sh"]
