@@ -13,21 +13,22 @@ ARG OPENTELEMETRY_VERSION="1.23.0"
 ARG BOOST_VERSION="1.75.0"
 ARG LOG4CXX_VERSION="0.11.0"
 
-# NOTE: bumped APR to a Trixie-friendly release
-ARG APR_VERSION="1.7.6"          # was 1.7.0
+# IMPORTANT: keep APR modern for Trixie toolchains
+ARG APR_VERSION="1.7.6"
 ARG APRUTIL_VERSION="1.6.1"
 ARG EXPAT_VERSION="2.3.0"
 ARG EXPAT_RVERSION="R_2_3_0"
 ARG LIBTOOL_VERSION="2.4.6"
 ARG BOOST_FILENAME="boost_1_75_0"
 
-# Optional (pipeline parity)
+# We will use Python 2.7 for GYP (as requested)
 ARG PYTHON_VERSION="2.7.8"
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV LANG=C.UTF-8
 
 # ---- Toolchain & build deps (Trixie-compatible) ----
+# Includes Python build deps so Python 2.7 builds its extension modules (math.so, etc.)
 RUN set -eux; \
     apt-get update; \
     apt-get install -y --no-install-recommends \
@@ -39,22 +40,33 @@ RUN set -eux; \
       libabsl-dev libre2-dev libc-ares-dev \
       libgrpc-dev libgrpc++-dev libgrpc++1 \
       libprotobuf-dev protobuf-compiler protobuf-compiler-grpc \
-      file gnupg patchelf; \
+      file gnupg patchelf \
+      # --- Python 2.7 build requirements (ensure shared libs and stdlib extensions) ---
+      libbz2-dev libreadline-dev libsqlite3-dev libffi-dev \
+      libncursesw5-dev libgdbm-dev uuid-dev; \
     rm -rf /var/lib/apt/lists/*
 
-# ---- (Optional) Python 2.7 ----
+# ---- (Optional) Build Python 2.7 for GYP; ensure extension modules exist ----
 RUN set -eux; \
     wget http://www.python.org/ftp/python/${PYTHON_VERSION}/Python-${PYTHON_VERSION}.tar.xz; \
-    unxz Python-${PYTHON_VERSION}.tar.xz; \
-    tar -xf Python-${PYTHON_VERSION}.tar; \
+    tar -xf Python-${PYTHON_VERSION}.tar.xz; \
     cd Python-${PYTHON_VERSION}; \
-    ./configure --prefix=/usr/local; \
+    ./configure --prefix=/usr/local --enable-shared; \
     make -j"$(nproc)"; \
     make install; \
+    ldconfig; \
+    # Ensure 'python' resolves to python2.7 for legacy GYP invocations
+    ln -sf /usr/local/bin/python2.7 /usr/local/bin/python; \
+    # Sanity-check that critical extension modules load
+    python2.7 - <<'PY'
+import sys; print("Python:", sys.version)
+import math, tempfile, random
+print("python2.7 OK: math/tempfile/random importable")
+PY
     cd ..; \
-    rm -rf Python-${PYTHON_VERSION}.tar Python-${PYTHON_VERSION}
+    rm -rf Python-${PYTHON_VERSION} Python-${PYTHON_VERSION}.tar.xz
 
-# ---- Dir prep ----
+# ---- Directory prep ----
 RUN mkdir -p /dependencies
 
 # ---- Boost (filesystem, system) static with PIC ----
@@ -69,15 +81,14 @@ RUN set -eux; \
     rm -rf ${BOOST_FILENAME}*
 
 # ---- APR (static) ----
-# Using APR 1.7.6 from official Apache mirrors (current recommended). [3](https://apr.apache.org/download.cgi)
+# Use APR 1.7.6 recommended release to avoid build issues on modern distros.
+# Official mirrors provide apr-1.7.6. [2](https://forums.raspberrypi.com/viewtopic.php?t=369682)
 RUN set -eux; \
     mkdir -p /dependencies/apr/${APR_VERSION}; \
     wget https://dlcdn.apache.org/apr/apr-${APR_VERSION}.tar.gz; \
     tar -xf apr-${APR_VERSION}.tar.gz; \
     cd apr-${APR_VERSION}; \
-    ./configure \
-      --prefix=/dependencies/apr/${APR_VERSION} \
-      --enable-static=yes --enable-shared=no --with-pic; \
+    ./configure --prefix=/dependencies/apr/${APR_VERSION} --enable-static=yes --enable-shared=no --with-pic; \
     make -j"$(nproc)"; \
     make install; \
     cd ..; rm -rf apr-${APR_VERSION}*
@@ -178,14 +189,15 @@ RUN set -eux; \
     tar -xvf nginx-${NGINX_VERSION}.tar.gz -C /build-dependencies; \
     rm -f nginx-${NGINX_VERSION}.tar.gz
 
-# ---- Copy module sources & build ----
+# ---- Copy module sources & build (force GYP to use python2.7) ----
 COPY . /otel-webserver-module
 RUN set -eux; \
     cp -r /dependencies /otel-webserver-module/; \
     cp -r /build-dependencies /otel-webserver-module/; \
     cd /otel-webserver-module; \
     chmod +x ./gradlew; \
-    ./gradlew assembleWebServerModule
+    # Ensure embedded GYP runs under Python 2.7
+    env PYTHON=/usr/local/bin/python2.7 ./gradlew assembleWebServerModule
 
 # ---- Unpack SDK & augment (exclude core + OpenSSL) ----
 RUN set -eux; \
