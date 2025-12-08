@@ -46,21 +46,27 @@ RUN set -eux; \
       libncursesw5-dev libgdbm-dev uuid-dev; \
     rm -rf /var/lib/apt/lists/*
 
-# ---- Build Python 2.7 for GYP; force-build math & cmath extension modules ----
+# ---- Fetch and unpack Python 2.7 sources ----
 RUN set -eux; \
     wget http://www.python.org/ftp/python/${PYTHON_VERSION}/Python-${PYTHON_VERSION}.tar.xz; \
-    tar -xf Python-${PYTHON_VERSION}.tar.xz; \
-    cd Python-${PYTHON_VERSION}; \
-    # Force-build required extension modules so imports never fail
-    # (built-in or shared works; here we build as built-ins for certainty)
-    cat > Modules/Setup.local <<'EOF'
-# Force build of math and cmath (require libm)
+    tar -xf Python-${PYTHON_VERSION}.tar.xz
+
+# ---- Force-build math & cmath in Python 2.7 (heredoc in its own RUN) ----
+RUN set -eux; \
+    cat <<'EOF' > Python-${PYTHON_VERSION}/Modules/Setup.local
+# Force build of math and cmath (linking with libm)
 math   mathmodule.c   -lm
 cmath  cmathmodule.c  -lm
 EOF
-    ./configure --prefix=/usr/local --enable-shared; \
-    make -j"$(nproc)"; \
-    make install; \
+
+# ---- Build + install Python 2.7 (separate RUN; use subshell for cd) ----
+RUN set -eux; \
+    ( \
+      cd Python-${PYTHON_VERSION} && \
+      ./configure --prefix=/usr/local --enable-shared && \
+      make -j"$(nproc)" && \
+      make install \
+    ); \
     ldconfig; \
     # Ensure 'python' resolves to python2.7 for legacy GYP invocations
     ln -sf /usr/local/bin/python2.7 /usr/local/bin/python
