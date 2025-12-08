@@ -48,7 +48,7 @@ RUN set -eux; \
   wget http://www.python.org/ftp/python/${PYTHON_VERSION}/Python-${PYTHON_VERSION}.tar.xz; \
   tar -xf Python-${PYTHON_VERSION}.tar.xz
 
-# ---- Force-build math & cmath (no heredoc to avoid parser issues) ----
+# ---- Force-build math & cmath (no heredoc) ----
 RUN set -eux; \
   printf '%s\n' \
     '# Force build of math and cmath (linking with libm)' \
@@ -56,26 +56,34 @@ RUN set -eux; \
     'cmath  cmathmodule.c  -lm' \
     > Python-${PYTHON_VERSION}/Modules/Setup.local
 
-# ---- Patch for glibc sinpi/cospi/tanpi collision (glibc 2.41 adds C23 trig funcs)
-#      Insert macro remaps immediately after #include "Python.h"
+# ---- Patch glibc collisions + map missing wrappers to libc (C99) ----
+# glibc 2.41: sinpi/cospi/tanpi added in <math.h> (C23) – avoid name collision.
+# Also map CPython's _Py_log1p/_Py_expm1 to libc log1p/expm1 so linking never misses them.
 RUN set -eux; \
-  awk '1; /#include "Python.h"/ { \
-          print "#if defined(__GLIBC__)"; \
-          print "#define sinpi _Py_sinpi"; \
-          print "#define cospi _Py_cospi"; \
-          print "#define tanpi _Py_tanpi"; \
-          print "#endif" }' \
-      Python-${PYTHON_VERSION}/Modules/mathmodule.c \
+  awk ' \
+    /#include "Python.h"/ { \
+      print; \
+      print "#if defined(__GLIBC__)"; \
+      print "#define sinpi _Py_sinpi"; \
+      print "#define cospi _Py_cospi"; \
+      print "#define tanpi _Py_tanpi"; \
+      print "#define _Py_log1p log1p"; \
+      print "#define _Py_expm1 expm1"; \
+      print "#endif"; \
+      next \
+    } \
+    { print }' \
+    Python-${PYTHON_VERSION}/Modules/mathmodule.c \
     > Python-${PYTHON_VERSION}/Modules/mathmodule.c.patched && \
   mv Python-${PYTHON_VERSION}/Modules/mathmodule.c.patched \
      Python-${PYTHON_VERSION}/Modules/mathmodule.c && \
-  grep -n 'sinpi' Python-${PYTHON_VERSION}/Modules/mathmodule.c
+  grep -n -E 'sinpi|_Py_log1p|_Py_expm1' Python-${PYTHON_VERSION}/Modules/mathmodule.c
 
 # ---- Build + install Python 2.7 ----
 RUN set -eux; \
   ( \
     cd Python-${PYTHON_VERSION} && \
-    ./configure --prefix=/usr/local --enable-shared && \
+    CPPFLAGS="-D_GNU_SOURCE" ./configure --prefix=/usr/local --enable-shared && \
     make -j"$(nproc)" && \
     make install \
   ); \
