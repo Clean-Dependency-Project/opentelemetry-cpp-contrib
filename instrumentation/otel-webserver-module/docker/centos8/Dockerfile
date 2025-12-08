@@ -58,14 +58,16 @@ RUN set -eux; \
     # Ensure 'python' resolves to python2.7 for legacy GYP invocations
     ln -sf /usr/local/bin/python2.7 /usr/local/bin/python
 
-# ---- Python 2.7 sanity-check + cleanup (separate RUN to avoid heredoc parse issues) ----
+# ---- Python 2.7 sanity-check (own RUN) ----
 RUN set -eux; \
     python2.7 - <<'PY'
 import sys; print("Python:", sys.version)
 import math, tempfile, random
 print("python2.7 OK: math/tempfile/random importable")
 PY
-    ; \
+
+# ---- Cleanup Python source tarball/tree (own RUN) ----
+RUN set -eux; \
     rm -rf Python-${PYTHON_VERSION} Python-${PYTHON_VERSION}.tar.xz
 
 # ---- Directory prep ----
