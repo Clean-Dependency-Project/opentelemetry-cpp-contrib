@@ -813,7 +813,7 @@ static ngx_int_t ngx_http_opentelemetry_init_worker(ngx_cycle_t *cycle)
     int p = getpid();
     char * s = (char *)ngx_pcalloc(cycle->pool, 6);
     sprintf(s, "%d", p);
-    ngx_writeTrace(NGX_LOG_ERR, cycle->log, 0, "mod_opentelemetry: ngx_http_opentelemetry_init_worker: Initializing Nginx Worker for process with PID: %s", s);
+    ngx_writeTrace(cycle->log, "ngx_http_opentelemetry_init_worker", "mod_opentelemetry: initializing Nginx worker", "PID: %s", s);
 
     /* Allocate memory for worker configuration */
     worker_conf = ngx_pcalloc(cycle->pool, sizeof(ngx_http_opentelemetry_worker_conf_t));
@@ -1016,10 +1016,8 @@ static OTEL_SDK_STATUS_CODE otel_startInteraction(ngx_http_request_t* r, const c
         }
         for(int i=0;i<ix;i++)
         {
-          if(propagationHeaders[i].name)
-    /* no free: constant string */
-          if(propagationHeaders[i].value)
-    /* no free: constant string */
+          if (propagationHeaders[i].name) { /* constant string */ }
+          if (propagationHeaders[i].value) { /* constant string */ }
         }
     }
     return res;
@@ -1049,7 +1047,7 @@ static void otel_variables_decorator(ngx_http_request_t* r){
         if(ngx_strcmp(propagator_type.data, (u_char*)"b3") == 0){
             for(ngx_uint_t j = 0; j<nelts; j++){
                 h = &header[j];
-                if(ngx_strcasecmp((u_char*)\"x-b3-traceid\", h->key.data)==0){
+                if(ngx_strcasecmp((u_char*)"x-b3-traceid", h->key.data)==0){
                     trace_id.data = h->value.data;
                     trace_id.len = h->value.len;
 
@@ -1060,7 +1058,7 @@ static void otel_variables_decorator(ngx_http_request_t* r){
         }else{
             for(ngx_uint_t j = 0; j<nelts; j++){
                 h = &header[j];
-                if(ngx_strcasecmp((u_char*)\"traceparent\", h->key.data)==0){
+                if(ngx_strcasecmp((u_char*)"traceparent", h->key.data)==0){
                     u_char *temp_trace_id = ngx_pnalloc(r->pool, TRACE_ID_LEN + 1);
                     ngx_memcpy(temp_trace_id, h->value.data + 3, TRACE_ID_LEN);
                     temp_trace_id[TRACE_ID_LEN] = '\0';
@@ -1077,7 +1075,7 @@ static void otel_variables_decorator(ngx_http_request_t* r){
     if(ctx->root_span_id.len == 0){
         // Getting root span id fromm ctx->propagationHeaders which is filled during otel_payload_decorator() call.
         for(int i = 0 ; i < ctx->pheaderCount ; i++ ){
-            if(strcasecmp(ctx->propagationHeaders[i].name , "Parent_Span_Id") == 0){
+            if(ngx_strcasecmp((u_char*)ctx->propagationHeaders[i].name, (u_char*)"Parent_Span_Id") == 0){
                 ctx->root_span_id.data = ngx_pcalloc(r->pool, strlen(ctx->propagationHeaders[i].value));
                 ngx_memcpy(ctx->root_span_id.data, ctx->propagationHeaders[i].value, strlen(ctx->propagationHeaders[i].value));
                 ctx->root_span_id.len = strlen(ctx->propagationHeaders[i].value);
@@ -1090,7 +1088,7 @@ static void otel_variables_decorator(ngx_http_request_t* r){
         if(ngx_strcmp(propagator_type.data, (u_char*)"w3c") == 0){
             for(ngx_uint_t j = 0; j<nelts; j++){
                 h = &header[j];
-                if(ngx_strcasecmp((u_char*)\"traceparent\", h->key.data)==0){
+                if(ngx_strcasecmp((u_char*)"traceparent", h->key.data)==0){
                     ctx->tracing_context.data = ngx_pcalloc(r->pool, h->value.len + 1);
                     ngx_memcpy(ctx->tracing_context.data, h->value.data, h->value.len + 1);
                     ngx_memcpy(ctx->tracing_context.data + TRACE_ID_LEN + 4, ctx->root_span_id.data , SPAN_ID_LEN);
@@ -1106,7 +1104,7 @@ static void otel_variables_decorator(ngx_http_request_t* r){
 
             for(ngx_uint_t j = 0; j<nelts; j++){
                 h = &header[j];
-                if(ngx_strcasecmp((u_char*)\"x-b3-sampled\", h->key.data)==0){
+                if(ngx_strcasecmp((u_char*)"x-b3-sampled", h->key.data)==0){
                     has_sampled = 1;
                     sampled.data = h->value.data;
                     sampled.len = h->value.len;
@@ -1195,7 +1193,7 @@ static void otel_payload_decorator(ngx_http_request_t* r, OTEL_SDK_ENV_RECORD* p
         h->hash = ngx_hash_key(h->key.data, h->key.len);
 
         h->value.len = strlen(propagationHeaders[i].value);
-        h->value.data = ngx_pcalloc(r->pool, sizeof(char)*((h->value.len)+1));
+        h->value.data = ngx_pcalloc(r->pool, 1);
         strcpy(h->value.data, propagationHeaders[i].value);
         h->lowcase_key = h->key.data;
 
@@ -1288,7 +1286,8 @@ static void resolve_attributes_variables(ngx_http_request_t* r)
 
     for (ngx_uint_t j = 0; j < conf->nginxModuleAttributes->nelts; j++) {
         
-        void *element = conf->nginxModuleAttributes->elts + (j * conf->nginxModuleAttributes->size);
+        char *base = (char*)conf->nginxModuleAttributes->elts;
+    void *element = (void*)(base + (j * conf->nginxModuleAttributes->size));
         ngx_str_t var_name = (((ngx_str_t *)(conf->nginxModuleAttributes->elts))[j]);
         ngx_uint_t           key; // The variable's hashed key.
         ngx_http_variable_value_t  *value; // Pointer to the value object.
@@ -1921,28 +1920,28 @@ static char* computeContextName(ngx_http_request_t *r, ngx_http_opentelemetry_lo
 
 static void traceConfig(ngx_http_request_t *r, ngx_http_opentelemetry_loc_conf_t* conf){
     ngx_writeTrace(r->connection->log, __func__, " Config { :"
-                                                      "(Enabled=\"%ld\")"
-                                                      "(OtelExporterEndpoint=\"%s\")"
-                                                      "(OtelExporterOtlpHeader=\"%s\")"
-                                                      "(OtelSslEnabled=\"%ld\")"
-                                                      "(OtelSslCertificatePath=\"%s\")"
-                                                      "(OtelSpanExporter=\"%s\")"
-                                                      "(OtelSpanProcessor=\"%s\")"
-                                                      "(OtelSampler=\"%s\")"
-                                                      "(ServiceNamespace=\"%s\")"
-                                                      "(ServiceName=\"%s\")"
-                                                      "(ServiceInstanceId=\"%s\")"
-                                                      "(OtelMaxQueueSize=\"%lu\")"
-                                                      "(OtelScheduledDelayMillis=\"%lu\")"
-                                                      "(OtelExportTimeoutMillis=\"%lu\")"
-                                                      "(OtelMaxExportBatchSize=\"%lu\")"
-                                                      "(ResolveBackends=\"%ld\")"
-                                                      "(TraceAsError=\"%ld\")"
-                                                      "(ReportAllInstrumentedModules=\"%ld\")"
-                                                      "(MaskCookie=\"%ld\")"
-                                                      "(MaskSmUser=\"%ld\")"
-                                                      "(SegmentType=\"%s\")"
-                                                      "(SegmentParameter=\"%s\")"
+                                                      "(Enabled="%ld")"
+                                                      "(OtelExporterEndpoint="%s")"
+                                                      "(OtelExporterOtlpHeader="%s")"
+                                                      "(OtelSslEnabled="%ld")"
+                                                      "(OtelSslCertificatePath="%s")"
+                                                      "(OtelSpanExporter="%s")"
+                                                      "(OtelSpanProcessor="%s")"
+                                                      "(OtelSampler="%s")"
+                                                      "(ServiceNamespace="%s")"
+                                                      "(ServiceName="%s")"
+                                                      "(ServiceInstanceId="%s")"
+                                                      "(OtelMaxQueueSize="%lu")"
+                                                      "(OtelScheduledDelayMillis="%lu")"
+                                                      "(OtelExportTimeoutMillis="%lu")"
+                                                      "(OtelMaxExportBatchSize="%lu")"
+                                                      "(ResolveBackends="%ld")"
+                                                      "(TraceAsError="%ld")"
+                                                      "(ReportAllInstrumentedModules="%ld")"
+                                                      "(MaskCookie="%ld")"
+                                                      "(MaskSmUser="%ld")"
+                                                      "(SegmentType="%s")"
+                                                      "(SegmentParameter="%s")"
                                                       " }",
                                                       conf->nginxModuleEnabled,
                                                       (conf->nginxModuleOtelExporterEndpoint).data,
@@ -1990,12 +1989,12 @@ static void removeUnwantedHeader(ngx_http_request_t* r)
       if(h->value.data)
         ngx_pfree(r->pool, h->value.data);
 
-      char str[] = "";
+      
       h->hash = ngx_hash_key(h->key.data, h->key.len);
 
       h->value.len = 0;
-      h->value.data = ngx_pcalloc(r->pool, sizeof(char)*((h->value.len)+1));
-      strcpy(h->value.data, str);
+      h->value.data = ngx_pcalloc(r->pool, 1);
+      ((u_char*)h->value.data)[0] = '\0';
       h->lowcase_key = h->key.data;
 
       cmcf = ngx_http_get_module_main_conf(r, ngx_http_core_module);
