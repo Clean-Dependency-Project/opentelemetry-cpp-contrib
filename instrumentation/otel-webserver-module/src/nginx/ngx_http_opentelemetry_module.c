@@ -823,7 +823,7 @@ static ngx_int_t ngx_http_opentelemetry_init_worker(ngx_cycle_t *cycle)
     //char * s = (char *)ngx_pcalloc(cycle->pool, 6);
     //sprintf(s, "%d", p);
     ngx_pid_t pid = ngx_pid;
-    ngx_writeTrace(NGX_LOG_ERR, cycle->log, 0, "mod_opentelemetry: ngx_http_opentelemetry_init_worker: Initializing Nginx Worker for process with PID: %P", pid);
+    ngx_writeTrace(cycle->log, 0, "mod_opentelemetry: ngx_http_opentelemetry_init_worker: Initializing Nginx Worker for process with PID: %P", pid);
 
     /* Allocate memory for worker configuration */
     worker_conf = ngx_pcalloc(cycle->pool, sizeof(ngx_http_opentelemetry_worker_conf_t));
