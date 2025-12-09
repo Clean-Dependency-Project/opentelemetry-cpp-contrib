@@ -5,127 +5,145 @@ plugins {
 apply plugin: 'cpp'
 apply from: 'common.gradle'
 apply plugin: 'de.undercouch.download'
+
 def coverageEnabled = System.getenv('enableCoverage')
-def target_system = System.getProperty('targetSystem') ?: 'centos6'
-def buildType = System.getProperty('buildType') ?: 'release'
+def target_system   = System.getProperty('targetSystem') ?: 'centos6'
+def buildType       = System.getProperty('buildType') ?: 'release'
+
 project.ext {
   // To do a 32-bit build, pass "-Dos.arch=x86"
-  platBuildDir = "${buildDir}/${osName}-${osArch}"
-  modDepDir = "${platBuildDir}/module-dependencies"
-  debug = false
+  platBuildDir     = "${buildDir}/${osName}-${osArch}"
+  modDepDir        = "${platBuildDir}/module-dependencies"
+  debug            = false
   if (buildType != 'release') {
     buildType = 'debug'
     debug = true
   }
-  ansdkOsName = osName
-  ansdkArch = (osArch == 'x86' ? 'i686' : osArch)
-  gccArchFlag = (osArch == 'x86' ? '-m32' : '-m64')
-  headSHA1 = "<dev>"
+
+  ansdkOsName      = osName
+  ansdkArch        = (osArch == 'x86' ? 'i686' : osArch)
+  gccArchFlag      = (osArch == 'x86' ? '-m32' : '-m64')
+
+  headSHA1         = "<dev>"
   try {
     def p = "git log -1 --pretty=%H".execute(null, new File("."))
     p.waitFor()
     headSHA1 = p.text.trim()
   } catch (e) {
-    // Ignore the exception
     headSHA1 = System.getenv('HEAD_SHA')
   }
-  def props = new Properties()
+
+  def props         = new Properties()
   props.load(new FileInputStream(file("version.properties")))
-  moduleVersion = props.get("server-module-version")
-  moduleRelease = props.get("release")
-  cppSDKVersion = props.get("CPP-SDK-version")
-  moduleName = "WebServer Module"
-  buildType = "Release Build"
-  fullVersion = "${moduleName} ${moduleVersion} ${moduleRelease} ${headSHA1}: ${buildType}"
+  moduleVersion     = props.get("server-module-version")
+  moduleRelease     = props.get("release")
+  cppSDKVersion     = props.get("CPP-SDK-version")
+
+  moduleName        = "WebServer Module"
+  buildType         = "Release Build"
+  fullVersion       = "${moduleName} ${moduleVersion} ${moduleRelease} ${headSHA1}: ${buildType}"
+
   // ---- gyp runner (shim created in Dockerfile) ----
-  gypPath = "$projectDir/scripts/gyp/r1919/gyp"
-  gypType = 'make' // or 'ninja'
-  scriptExt = 'sh'
-  sharedLibraryExt = 'so'
+  gypPath           = "$projectDir/scripts/gyp/r1919/gyp"
+  gypType           = 'make' // or 'ninja'
+  scriptExt         = 'sh'
+  sharedLibraryExt  = 'so'
+
   nginxSupportedVersions = props.get("nginxSupportedVersions").split(',')
-  libraryStageDir = "${platBuildDir}/opentelemetry-webserver-sdk"
-  nginxStageDir = "${libraryStageDir}/WebServerModule/Nginx"
+
+  libraryStageDir   = "${platBuildDir}/opentelemetry-webserver-sdk"
+  nginxStageDir     = "${libraryStageDir}/WebServerModule/Nginx"
+
   coverageCompilerFlags = '-g -fprofile-arcs -ftest-coverage'
-  coverageLinkerFlags = '-lgcov --coverage'
-  libraryFlags = '-lrt -lpthread -ldl -lz -lcrypt'
-  COVERAGE_DIR = "${platBuildDir}/coverage"
-  LCOV_RAW_INFO = "${COVERAGE_DIR}/lcov-raw.info"
-  LCOV_INFO = "${COVERAGE_DIR}/lcov.info"
-  BOOST_INCLUDE = "${modDepDir}/boost/1.75.0/include"
-  BOOST_LIB = "${modDepDir}/boost/1.75.0/lib/libboost_filesystem.a ${modDepDir}/boost/1.75.0/lib/libboost_system.a"
-  // Versions built in the Docker image (used by build.gyp via environment expansion)
-  APR_VERSION = "1.7.6"
-  APRUTIL_VERSION = "1.6.1"
-  EXPAT_VERSION = "2.3.0"
-  LOG4CXX_VERSION = "0.11.0"
+  coverageLinkerFlags   = '-lgcov --coverage'
+  libraryFlags          = '-lrt -lpthread -ldl -lz -lcrypt'
+
+  COVERAGE_DIR      = "${platBuildDir}/coverage"
+  LCOV_RAW_INFO     = "${COVERAGE_DIR}/lcov-raw.info"
+  LCOV_INFO         = "${COVERAGE_DIR}/lcov.info"
+
+  BOOST_INCLUDE     = "${modDepDir}/boost/1.75.0/include"
+  BOOST_LIB         = "${modDepDir}/boost/1.75.0/lib/libboost_filesystem.a ${modDepDir}/boost/1.75.0/lib/libboost_system.a"
+
+  // Versions baked into Docker image; used by build.gyp via env expansion
+  APR_VERSION       = "1.7.6"
+  APRUTIL_VERSION   = "1.6.1"
+  EXPAT_VERSION     = "2.3.0"
+  LOG4CXX_VERSION   = "0.11.0"
 }
+
 task extractANSDK(type: Copy) {
   from "dependencies"
   into modDepDir
 }
+
 task generateModuleVersionHeader(type: Copy) {
-  group = 'SDK Library'
+  group       = 'SDK Library'
   description = 'Generate the module_version.h header'
   def headerFile = file("src/sdk_lib/include/core/module_version.h")
   from "src/module_version_template.h"
   into "include/core"
   rename { String f -> "module_version.h" }
   expand(
-    headSHA1 : headSHA1,
+    headSHA1      : headSHA1,
     moduleVersion : moduleVersion,
     moduleRelease : moduleRelease,
     cppSDKVersion : cppSDKVersion,
-    fullVersion : fullVersion
+    fullVersion   : fullVersion
   )
 }
+
 task generateVersionFile(type: Copy) {
-  group = 'SDK Library'
+  group       = 'SDK Library'
   description = 'Generate the VERSION.txt file'
   from "dist/VERSION.txt"
   into libraryStageDir
   expand(
-    headSHA1 : headSHA1,
+    headSHA1      : headSHA1,
     moduleVersion : moduleVersion,
     moduleRelease : moduleRelease,
     cppSDKVersion : cppSDKVersion,
-    fullVersion : fullVersion
+    fullVersion   : fullVersion
   )
 }
+
 task generateSources {
-  group = 'SDK Library'
+  group       = 'SDK Library'
   description = 'Generate all sources'
   dependsOn generateVersionFile, generateModuleVersionHeader
 }
+
 // ---- GYP generation ----
 task gypLibrary(type: Exec) {
-  group = 'SDK Library'
+  group       = 'SDK Library'
   description = 'Run gyp to generate the platform-specific build scripts'
   dependsOn extractANSDK, generateSources
-  inputs.file "src/build.gyp"
+
+  inputs.file  "src/build.gyp"
   outputs.file "${platBuildDir}/Makefile" // change to build.ninja if gypType='ninja'
-  // Environment for gyp + later build steps (make/ninja)
+
   ext.libraryBuildEnvironment = [
-    ARCH_FLAG : gccArchFlag,
-    ANSDK_DIR : modDepDir,
-    COMPILER_FLAGS : (coverageEnabled) ? coverageCompilerFlags : '',
-    LINKER_FLAGS : (coverageEnabled) ? coverageLinkerFlags : '',
-    BOOST_LIB : BOOST_LIB,
-    BOOST_INCLUDE : BOOST_INCLUDE,
-    LIBRARY_FLAGS : libraryFlags,
-    CPP_SDK_VERSION : cppSDKVersion,
-    APR_VERSION : APR_VERSION,
-    APRUTIL_VERSION : APRUTIL_VERSION,
-    EXPAT_VERSION : EXPAT_VERSION,
-    LOG4CXX_VERSION : LOG4CXX_VERSION,
-    // Ensure venv (with gyp-next) tools are preferred
-    PATH : "/opt/gyp-venv/bin:" + System.getenv('PATH')
-    // Do NOT set PYTHON; shim uses its venv automatically
+    ARCH_FLAG        : gccArchFlag,
+    ANSDK_DIR        : modDepDir,
+    COMPILER_FLAGS   : (coverageEnabled) ? coverageCompilerFlags : '',
+    LINKER_FLAGS     : (coverageEnabled) ? coverageLinkerFlags : '',
+    BOOST_LIB        : BOOST_LIB,
+    BOOST_INCLUDE    : BOOST_INCLUDE,
+    LIBRARY_FLAGS    : libraryFlags,
+    CPP_SDK_VERSION  : cppSDKVersion,
+    APR_VERSION      : APR_VERSION,
+    APRUTIL_VERSION  : APRUTIL_VERSION,
+    EXPAT_VERSION    : EXPAT_VERSION,
+    LOG4CXX_VERSION  : LOG4CXX_VERSION,
+    PATH             : "/opt/gyp-venv/bin:" + System.getenv('PATH')
   ]
   environment libraryBuildEnvironment
+
   workingDir 'src'
   doFirst {
     file(platBuildDir).mkdirs()
   }
+
   commandLine gypPath,
     "--generator-output=${platBuildDir}",
     "--toplevel-dir=.",
@@ -133,53 +151,95 @@ task gypLibrary(type: Exec) {
     "-f", gypType,
     "build.gyp"
 }
+
 // ---- Compile the SDK library using generated Makefiles ----
 task buildLibrary(type: Exec) {
-  group = 'SDK Library'
+  group       = 'SDK Library'
   description = 'Compile the SDK library'
   dependsOn gypLibrary
+
   inputs.property "buildType", buildType
   inputs.dir 'src/util'
-  outputs.file "${platBuildDir}/out/Default/lib.target/libopentelemetry_webserver_sdk.so"
-  // Use same environment as gypLibrary (contains PATH + versions)
+  // We won't rely on a single fixed path; we'll locate the .so/.a dynamically.
+  outputs.upToDateWhen { false }
+
   environment gypLibrary.libraryBuildEnvironment
-  // Optional sanity (static libs do not need this; OK to omit)
-  // environment "LD_LIBRARY_PATH", "${modDepDir}/apache-log4cxx/${LOG4CXX_VERSION}/lib:${modDepDir}/apr/${APR_VERSION}/lib:${modDepDir}/apr-util/${APRUTIL_VERSION}/lib:${modDepDir}/expat/${EXPAT_VERSION}/lib:${System.getenv('LD_LIBRARY_PATH') ?: ''}"
   workingDir "${platBuildDir}"
   commandLine 'make', 'V=1', '-j', Runtime.runtime.availableProcessors().toString()
 }
+
+/**
+ * Locate the built SDK shared/static library regardless of output folder (Default, Release, etc.).
+ * Produces:
+ *   project.ext.sdkSoPath  : absolute path to libopentelemetry_webserver_sdk.so or .a
+ *   project.ext.sdkSoDir   : absolute directory containing the library
+ */
+task locateSdkLibrary {
+  group = 'SDK Library'
+  description = 'Discover the built SDK library (.so/.a) under platBuildDir'
+  dependsOn buildLibrary
+  doLast {
+    def candidates = fileTree("${platBuildDir}").matching {
+      include "**/libopentelemetry_webserver_sdk.so"
+      include "**/libopentelemetry_webserver_sdk.a"
+    }.files.toList()
+
+    if (candidates.isEmpty()) {
+      throw new GradleException("SDK library not found under ${platBuildDir}. Expected libopentelemetry_webserver_sdk.(so|a) produced by buildLibrary.")
+    }
+
+    // Prefer .so over .a if both exist
+    def chosen = candidates.find { it.name.endsWith(".so") } ?: candidates.first()
+    project.ext.sdkSoPath = chosen.absolutePath
+    project.ext.sdkSoDir  = chosen.parentFile.absolutePath
+    logger.lifecycle("Using SDK library: ${project.ext.sdkSoPath}")
+  }
+}
+
 // ---- Stage SDK ----
 task stageLibrary(type: Copy) {
-  group = 'SDK Library'
+  group       = 'SDK Library'
   description = 'Stage the SDK library distribution'
+  dependsOn locateSdkLibrary
+
   doLast {
     def logDir = file("${libraryStageDir}/logs")
     logDir.mkdirs()
     logDir.setWritable(true)
   }
+
   from("dist/runSDKProxy.sh") { it.fileMode 0770 }
-  from(buildLibrary) { it.into "sdk_lib/lib" }
-  from("${modDepDir}/opentelemetry/${cppSDKVersion}/lib/libopentelemetry_common.so") { it.into "sdk_lib/lib" }
-  from("${modDepDir}/opentelemetry/${cppSDKVersion}/lib/libopentelemetry_resources.so") { it.into "sdk_lib/lib" }
-  from("${modDepDir}/opentelemetry/${cppSDKVersion}/lib/libopentelemetry_trace.so") { it.into "sdk_lib/lib" }
-  from("${modDepDir}/opentelemetry/${cppSDKVersion}/lib/libopentelemetry_otlp_recordable.so") { it.into "sdk_lib/lib" }
+
+  // Copy the discovered SDK lib into the expected staging dir
+  from(project.ext.sdkSoPath) { it.into "sdk_lib/lib" }
+
+  // Stage other dependent SDK shared libraries
+  from("${modDepDir}/opentelemetry/${cppSDKVersion}/lib/libopentelemetry_common.so")                { it.into "sdk_lib/lib" }
+  from("${modDepDir}/opentelemetry/${cppSDKVersion}/lib/libopentelemetry_resources.so")             { it.into "sdk_lib/lib" }
+  from("${modDepDir}/opentelemetry/${cppSDKVersion}/lib/libopentelemetry_trace.so")                 { it.into "sdk_lib/lib" }
+  from("${modDepDir}/opentelemetry/${cppSDKVersion}/lib/libopentelemetry_otlp_recordable.so")       { it.into "sdk_lib/lib" }
   from("${modDepDir}/opentelemetry/${cppSDKVersion}/lib/libopentelemetry_exporter_ostream_span.so") { it.into "sdk_lib/lib" }
-  from("${modDepDir}/opentelemetry/${cppSDKVersion}/lib/libopentelemetry_exporter_otlp_grpc.so") { it.into "sdk_lib/lib" }
+  from("${modDepDir}/opentelemetry/${cppSDKVersion}/lib/libopentelemetry_exporter_otlp_grpc.so")    { it.into "sdk_lib/lib" }
+
   from("dist/opentelemetry_sdk_log4cxx.xml.template") { it.into "conf" }
   from("dist/install.${scriptExt}") { it.fileMode 0700 }
+
   into libraryStageDir
 }
+
 task stripLibrary(type: Exec) {
-  group = 'SDK Library'
+  group       = 'SDK Library'
   description = 'Strip the production library'
   onlyIf { !debug }
   inputs.dir stageLibrary
   outputs.dir "${libraryStageDir}/sdk_lib/lib/libopentelemetry_webserver_sdk.${sharedLibraryExt}"
+
   workingDir "${libraryStageDir}/sdk_lib/lib"
   commandLine 'strip', '-x', "libopentelemetry_webserver_sdk.${sharedLibraryExt}"
 }
+
 task assembleLibrary(type: Tar) {
-  group = 'SDK Library'
+  group       = 'SDK Library'
   description = 'Assemble the library (tgz)'
   dependsOn stripLibrary
   from stageLibrary
@@ -188,79 +248,99 @@ task assembleLibrary(type: Tar) {
   destinationDir buildDir
   compression Compression.GZIP
 }
-// ---- NGINX (unchanged functional flow) ----
+
+// ---- NGINX (with dependency ordering) ----
 nginxSupportedVersions.each { nginxVersion ->
+
   task("downloadNginx${nginxVersion}", type: Download) {
     src "http://nginx.org/download/nginx-${nginxVersion}.tar.gz"
     dest buildDir
     overwrite false
   }
+
   task("extractNginx${nginxVersion}", type: Copy) {
     dependsOn "downloadNginx${nginxVersion}"
     from tarTree(resources.gzip("build/nginx-${nginxVersion}.tar.gz"))
     into buildDir
   }
+
   task("configureNginx${nginxVersion}", type: Exec) {
-    group = 'OpenTelemetry module for Nginx'
+    group       = 'OpenTelemetry module for Nginx'
     description = 'Run configure to generate the build files for OpenTelemetry Module for Nginx'
+
+    // Ensure the SDK is compiled and staged before configure
     dependsOn "extractNginx${nginxVersion}"
-    dependsOn stageLibrary   // ✅ added: ensure SDK .so is staged before configure
+    dependsOn stageLibrary
+
     workingDir "${buildDir}/nginx-${nginxVersion}"
+
+    // Linker gets -L to the staged directory; optionally add rpath for runtime convenience
     commandLine './configure',
       "--with-compat",
       "--with-cc-opt=-Wno-error -Wno-unused-variable -Wno-unused-but-set-variable",
-      "--with-ld-opt=-L${libraryStageDir}/sdk_lib/lib",
+      "--with-ld-opt=-L${libraryStageDir}/sdk_lib/lib -Wl,-rpath,${libraryStageDir}/sdk_lib/lib",
       "--add-dynamic-module=${projectDir}/src/nginx"
   }
+
   task("delMakefile${nginxVersion}", type: Exec) {
-    group = 'OpenTelemetry module for Nginx'
+    group       = 'OpenTelemetry module for Nginx'
     description = 'Deleting old Makefile'
     workingDir "${buildDir}/nginx-${nginxVersion}/objs"
     commandLine 'rm', '-rf', 'Makefile'
   }
+
   task("copyMakefile${nginxVersion}", type: Copy) {
-    group = 'OpenTelemetry module for Nginx'
+    group       = 'OpenTelemetry module for Nginx'
     description = 'Copying Makefile for compiling Nginx Web Server Agent'
     dependsOn "delMakefile${nginxVersion}"
     from "src/nginx/Makefile"
     into "${buildDir}/nginx-${nginxVersion}/objs/"
   }
+
   task("updateMakefile${nginxVersion}", type: Exec) {
-    group = 'OpenTelemetry module for Nginx'
+    group       = 'OpenTelemetry module for Nginx'
     description = 'Updating the Makefile for dynamic build'
     commandLine 'bash', '-c', "src/nginx/script.sh ${buildDir}/nginx-${nginxVersion}/objs/Makefile"
   }
+
   task("buildNginxModule${nginxVersion}", type: Exec) {
-    group = 'OpenTelemetry module for Nginx'
+    group       = 'OpenTelemetry module for Nginx'
     description = 'Build the Nginx Web Server Agent'
+
     dependsOn "configureNginx${nginxVersion}"
     dependsOn stageLibrary
     dependsOn "updateMakefile${nginxVersion}"
+
     outputs.file "${buildDir}/nginx-${nginxVersion}/objs/ngx_http_opentelemetry_module.so"
     workingDir "${buildDir}/nginx-${nginxVersion}"
-    commandLine 'make', 'modules'
+
+    // Verbose link line, helpful for diagnostics
+    commandLine 'make', 'V=1', 'modules'
   }
+
   task("stageNginxModule${nginxVersion}", type: Copy) {
-    group = 'OpenTelemetry module for Nginx'
+    group       = 'OpenTelemetry module for Nginx'
     description = 'Stage the Nginx Web Server Agent distribution directory'
     dependsOn "buildNginxModule${nginxVersion}"
     def nginxStageDirVersion = "${nginxStageDir}/${nginxVersion}"
     from "${buildDir}/nginx-${nginxVersion}/objs/ngx_http_opentelemetry_module.so"
     into nginxStageDirVersion
   }
+
   task("stripNginxModule${nginxVersion}", type: Exec) {
-    group = 'OpenTelemetry module for Nginx'
+    group       = 'OpenTelemetry module for Nginx'
     description = 'Strip the production Nginx Web Server Agent'
     dependsOn "stageNginxModule${nginxVersion}"
     onlyIf { !debug }
-    inputs.dir "stageNginxModule${nginxVersion}"
+    inputs.dir "${nginxStageDir}/${nginxVersion}"
     outputs.file "${nginxStageDir}/${nginxVersion}/ngx_http_opentelemetry_module.${sharedLibraryExt}"
     workingDir "${nginxStageDir}/${nginxVersion}"
     commandLine 'strip', '-x', "ngx_http_opentelemetry_module.${sharedLibraryExt}"
   }
 }
+
 task assembleNginxModule(type: Tar) {
-  group = 'Nginx Web Server Module'
+  group       = 'Nginx Web Server Module'
   description = 'Assemble the Nginx Web Server module artifact (tgz)'
   nginxSupportedVersions.each { nginxVersion ->
     dependsOn "stripNginxModule${nginxVersion}"
@@ -271,9 +351,9 @@ task assembleNginxModule(type: Tar) {
   destinationDir file(buildDir)
   compression Compression.GZIP
 }
-// ---- Packages the complete Web Server Agent ----
+
 task assembleWebServerModule(type: Tar) {
-  group = 'Web Server Agent'
+  group       = 'Web Server Agent'
   description = 'Assemble the Web Server agent artifact (tgz)'
   nginxSupportedVersions.each { nginxVersion ->
     dependsOn "stripNginxModule${nginxVersion}"
@@ -284,29 +364,33 @@ task assembleWebServerModule(type: Tar) {
   destinationDir file(buildDir)
   compression Compression.GZIP
 }
+
 // ---- Tests ----
 task gypUnitTest(type: Exec) {
   dependsOn stageLibrary
   inputs.file 'test/unit/unit_test.gyp'
   outputs.file "${platBuildDir}/unit_test/Makefile"
+
   ext.testBuildEnvironment = [
     OTEL_SDK_LIB_DIR : "${libraryStageDir}/sdk_lib",
-    ANSDK_DIR : modDepDir,
-    BOOST_LIB : BOOST_LIB,
-    BOOST_INCLUDE : BOOST_INCLUDE,
-    LIBRARY_FLAGS : libraryFlags,
-    CPP_SDK_VERSION : cppSDKVersion,
-    APR_VERSION : APR_VERSION,
-    APRUTIL_VERSION : APRUTIL_VERSION,
-    EXPAT_VERSION : EXPAT_VERSION,
-    LOG4CXX_VERSION : LOG4CXX_VERSION,
-    PATH : "/opt/gyp-venv/bin:" + System.getenv('PATH')
+    ANSDK_DIR        : modDepDir,
+    BOOST_LIB        : BOOST_LIB,
+    BOOST_INCLUDE    : BOOST_INCLUDE,
+    LIBRARY_FLAGS    : libraryFlags,
+    CPP_SDK_VERSION  : cppSDKVersion,
+    APR_VERSION      : APR_VERSION,
+    APRUTIL_VERSION  : APRUTIL_VERSION,
+    EXPAT_VERSION    : EXPAT_VERSION,
+    LOG4CXX_VERSION  : LOG4CXX_VERSION,
+    PATH             : "/opt/gyp-venv/bin:" + System.getenv('PATH')
   ]
   environment testBuildEnvironment
+
   workingDir 'test/unit'
   doFirst {
     file("${platBuildDir}/unit_test").mkdirs()
   }
+
   commandLine gypPath,
     "--generator-output=${platBuildDir}/unit_test",
     "--toplevel-dir=.",
@@ -314,6 +398,7 @@ task gypUnitTest(type: Exec) {
     "-f", gypType,
     "unit_test.gyp"
 }
+
 task makeUnitTest(type: Exec) {
   dependsOn gypUnitTest
   inputs.dir 'test/unit'
@@ -322,6 +407,7 @@ task makeUnitTest(type: Exec) {
   workingDir "${platBuildDir}/unit_test"
   commandLine 'make', 'V=1'
 }
+
 task runUnitTest(type: Exec) {
   dependsOn makeUnitTest
   environment gypUnitTest.testBuildEnvironment
@@ -329,9 +415,10 @@ task runUnitTest(type: Exec) {
   workingDir "${platBuildDir}/unit_test/out/Default"
   commandLine './unit_test'
 }
+
 // ---- Coverage ----
 task lcovCapture(type: Exec) {
-  group = 'Code Coverage'
+  group       = 'Code Coverage'
   description = 'capture coverage info'
   dependsOn runUnitTest
   ext.tracefile = file(LCOV_RAW_INFO)
@@ -342,8 +429,9 @@ task lcovCapture(type: Exec) {
       '--directory', "${platBuildDir}",
       '--no-external'
 }
+
 task lcov(type: Exec) {
-  group = 'Code Coverage'
+  group       = 'Code Coverage'
   description = 'remove noise from captured coverage info'
   dependsOn lcovCapture
   ext.tracefile = file(LCOV_INFO)
@@ -355,8 +443,9 @@ task lcov(type: Exec) {
       '--remove', lcovCapture.tracefile,
       '*/prebuilt/*', '*.pb.*', '/opt/rh/*', '/usr/include/*', '*.h', '*.hpp'
 }
+
 task coverageHtml(type: Exec) {
-  group = 'Code Coverage'
+  group       = 'Code Coverage'
   description = 'generate html coverage report'
   dependsOn lcov
   inputs.file lcov.tracefile
@@ -370,18 +459,15 @@ task coverageHtml(type: Exec) {
       '--demangle-cpp',
       lcov.tracefile
 }
+
 model {
   buildTypes {
     debug
     release
   }
   platforms {
-    x86 {
-      architecture "x86"
-    }
-    x64 {
-      architecture "x86_64"
-    }
+    x86  { architecture "x86" }
+    x64  { architecture "x86_64" }
   }
   binaries {
     all {
@@ -405,7 +491,7 @@ model {
     libs(PrebuiltLibraries) { libs ->
       otel {
         headers.srcDirs "${libraryStageDir}/sdk_lib"
-        // See FIXME on sources.cpp.lib library: 'otel' above
+        // Optional: point Gradle’s native model to the staged .so explicitly.
         // binaries.withType(SharedLibraryBinary) {
         //   sharedLibraryFile = file("${libraryStageDir}/sdk_lib/lib/libopentelemetry_webserver_sdk.so")
         // }
