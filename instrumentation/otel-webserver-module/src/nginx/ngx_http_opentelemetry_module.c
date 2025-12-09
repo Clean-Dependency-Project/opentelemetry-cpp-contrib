@@ -198,7 +198,16 @@ static ngx_http_variable_t otel_ngx_variables[] = {
     0,
   },
   
-  ngx_null_command
+  //ngx_null_command
+  {
+    ngx_null_string,     /* name */
+    NULL,                /* set_handler */
+    NULL,                /* get_handler */
+    0,                   /* data */
+    0,                   /* flags */
+    0                    /* index */
+ }
+
 };
 
 
@@ -766,7 +775,7 @@ static ngx_int_t ngx_http_opentelemetry_init(ngx_conf_t *cf)
                         case NGX_HTTP_LOG_PHASE:
                             if(lp < cmcf->phases[NGX_HTTP_LOG_PHASE].handlers.nelts){
                                 h[res] = ((ngx_http_handler_pt*)cmcf->phases[NGX_HTTP_LOG_PHASE].handlers.elts)[lp];
-                                ((ngx_http_handler_pt*)cmcf->phases[NGX_HTTP_LOG_PHASE].handlers.elts)[cp] = otel_monitored_modules[res].handler;
+                                ((ngx_http_handler_pt*)cmcf->phases[NGX_HTTP_LOG_PHASE].handlers.elts)[lp] = otel_monitored_modules[res].handler;
                                 lp++;
                             }
                             break;
@@ -810,10 +819,11 @@ static ngx_int_t ngx_http_opentelemetry_init(ngx_conf_t *cf)
 */
 static ngx_int_t ngx_http_opentelemetry_init_worker(ngx_cycle_t *cycle)
 {
-    int p = getpid();
-    char * s = (char *)ngx_pcalloc(cycle->pool, 6);
-    sprintf(s, "%d", p);
-    ngx_writeTrace(NGX_LOG_ERR, cycle->log, 0, "mod_opentelemetry: ngx_http_opentelemetry_init_worker: Initializing Nginx Worker for process with PID: %s", s);
+    //int p = getpid();
+    //char * s = (char *)ngx_pcalloc(cycle->pool, 6);
+    //sprintf(s, "%d", p);
+    ngx_pid_t pid = ngx_pid;
+    ngx_writeTrace(NGX_LOG_ERR, cycle->log, 0, "mod_opentelemetry: ngx_http_opentelemetry_init_worker: Initializing Nginx Worker for process with PID: %P", pid);
 
     /* Allocate memory for worker configuration */
     worker_conf = ngx_pcalloc(cycle->pool, sizeof(ngx_http_opentelemetry_worker_conf_t));
@@ -822,7 +832,19 @@ static ngx_int_t ngx_http_opentelemetry_init_worker(ngx_cycle_t *cycle)
        return NGX_ERROR;
     }
 
-    worker_conf->pid = s;
+    //worker_conf->pid = s;
+   /*
+     * Retain worker_conf->pid as a string since other places log it with %s.
+     * Build a safe string using ngx_sprintf and NGX_INT64_LEN.
+     */
+    {
+        u_char *buf = ngx_pnalloc(cycle->pool, NGX_INT64_LEN + 1);
+        if (buf != NULL) {
+            u_char *end = ngx_sprintf(buf, "%P", pid);
+            *end = '\0';
+        }
+        worker_conf->pid = (char *)buf;
+    }
 
     return NGX_OK;
 }
