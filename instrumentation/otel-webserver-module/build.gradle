@@ -30,6 +30,7 @@ project.ext {
     p.waitFor()
     headSHA1 = p.text.trim()
   } catch (e) {
+    // Ignore the exception
     headSHA1 = System.getenv('HEAD_SHA')
   }
 
@@ -65,7 +66,7 @@ project.ext {
   BOOST_INCLUDE     = "${modDepDir}/boost/1.75.0/include"
   BOOST_LIB         = "${modDepDir}/boost/1.75.0/lib/libboost_filesystem.a ${modDepDir}/boost/1.75.0/lib/libboost_system.a"
 
-  // Versions baked into Docker image; used by build.gyp via env expansion
+  // Versions baked into the Docker image; used by build.gyp via env expansion
   APR_VERSION       = "1.7.6"
   APRUTIL_VERSION   = "1.6.1"
   EXPAT_VERSION     = "2.3.0"
@@ -122,6 +123,7 @@ task gypLibrary(type: Exec) {
   inputs.file  "src/build.gyp"
   outputs.file "${platBuildDir}/Makefile" // change to build.ninja if gypType='ninja'
 
+  // Environment for gyp + later build steps (make/ninja)
   ext.libraryBuildEnvironment = [
     ARCH_FLAG        : gccArchFlag,
     ANSDK_DIR        : modDepDir,
@@ -135,7 +137,9 @@ task gypLibrary(type: Exec) {
     APRUTIL_VERSION  : APRUTIL_VERSION,
     EXPAT_VERSION    : EXPAT_VERSION,
     LOG4CXX_VERSION  : LOG4CXX_VERSION,
+    // Prefer venv (gyp-next) tools
     PATH             : "/opt/gyp-venv/bin:" + System.getenv('PATH')
+    // Do NOT set PYTHON; shim uses its venv automatically
   ]
   environment libraryBuildEnvironment
 
@@ -160,47 +164,20 @@ task buildLibrary(type: Exec) {
 
   inputs.property "buildType", buildType
   inputs.dir 'src/util'
-  // We won't rely on a single fixed path; we'll locate the .so/.a dynamically.
+  // Do not hard-code output path; stageLibrary will discover it dynamically.
   outputs.upToDateWhen { false }
 
   environment gypLibrary.libraryBuildEnvironment
+
   workingDir "${platBuildDir}"
   commandLine 'make', 'V=1', '-j', Runtime.runtime.availableProcessors().toString()
 }
 
-/**
- * Locate the built SDK shared/static library regardless of output folder (Default, Release, etc.).
- * Produces:
- *   project.ext.sdkSoPath  : absolute path to libopentelemetry_webserver_sdk.so or .a
- *   project.ext.sdkSoDir   : absolute directory containing the library
- */
-task locateSdkLibrary {
-  group = 'SDK Library'
-  description = 'Discover the built SDK library (.so/.a) under platBuildDir'
-  dependsOn buildLibrary
-  doLast {
-    def candidates = fileTree("${platBuildDir}").matching {
-      include "**/libopentelemetry_webserver_sdk.so"
-      include "**/libopentelemetry_webserver_sdk.a"
-    }.files.toList()
-
-    if (candidates.isEmpty()) {
-      throw new GradleException("SDK library not found under ${platBuildDir}. Expected libopentelemetry_webserver_sdk.(so|a) produced by buildLibrary.")
-    }
-
-    // Prefer .so over .a if both exist
-    def chosen = candidates.find { it.name.endsWith(".so") } ?: candidates.first()
-    project.ext.sdkSoPath = chosen.absolutePath
-    project.ext.sdkSoDir  = chosen.parentFile.absolutePath
-    logger.lifecycle("Using SDK library: ${project.ext.sdkSoPath}")
-  }
-}
-
-// ---- Stage SDK ----
+// ---- Stage SDK (robust discovery of .so/.a anywhere under platBuildDir) ----
 task stageLibrary(type: Copy) {
   group       = 'SDK Library'
   description = 'Stage the SDK library distribution'
-  dependsOn locateSdkLibrary
+  dependsOn buildLibrary
 
   doLast {
     def logDir = file("${libraryStageDir}/logs")
@@ -208,18 +185,24 @@ task stageLibrary(type: Copy) {
     logDir.setWritable(true)
   }
 
+  // Scripts
   from("dist/runSDKProxy.sh") { it.fileMode 0770 }
 
-  // Copy the discovered SDK lib into the expected staging dir
-  from(project.ext.sdkSoPath) { it.into "sdk_lib/lib" }
+  // ✅ Robust: copy the SDK lib (.so OR .a) from wherever gyp/make placed it
+  from(fileTree("${platBuildDir}").matching {
+    include "**/libopentelemetry_webserver_sdk.so"
+    include "**/libopentelemetry_webserver_sdk.a"
+  }) {
+    it.into "sdk_lib/lib"
+  }
 
-  // Stage other dependent SDK shared libraries
-  from("${modDepDir}/opentelemetry/${cppSDKVersion}/lib/libopentelemetry_common.so")                { it.into "sdk_lib/lib" }
-  from("${modDepDir}/opentelemetry/${cppSDKVersion}/lib/libopentelemetry_resources.so")             { it.into "sdk_lib/lib" }
-  from("${modDepDir}/opentelemetry/${cppSDKVersion}/lib/libopentelemetry_trace.so")                 { it.into "sdk_lib/lib" }
-  from("${modDepDir}/opentelemetry/${cppSDKVersion}/lib/libopentelemetry_otlp_recordable.so")       { it.into "sdk_lib/lib" }
-  from("${modDepDir}/opentelemetry/${cppSDKVersion}/lib/libopentelemetry_exporter_ostream_span.so") { it.into "sdk_lib/lib" }
-  from("${modDepDir}/opentelemetry/${cppSDKVersion}/lib/libopentelemetry_exporter_otlp_grpc.so")    { it.into "sdk_lib/lib" }
+  // Other dependent SDK shared libraries
+  from("${modDepDir}/opentelemetry/${cppSDKVersion}/lib/libopentelemetry_common.so")                 { it.into "sdk_lib/lib" }
+  from("${modDepDir}/opentelemetry/${cppSDKVersion}/lib/libopentelemetry_resources.so")              { it.into "sdk_lib/lib" }
+  from("${modDepDir}/opentelemetry/${cppSDKVersion}/lib/libopentelemetry_trace.so")                  { it.into "sdk_lib/lib" }
+  from("${modDepDir}/opentelemetry/${cppSDKVersion}/lib/libopentelemetry_otlp_recordable.so")        { it.into "sdk_lib/lib" }
+  from("${modDepDir}/opentelemetry/${cppSDKVersion}/lib/libopentelemetry_exporter_ostream_span.so")  { it.into "sdk_lib/lib" }
+  from("${modDepDir}/opentelemetry/${cppSDKVersion}/lib/libopentelemetry_exporter_otlp_grpc.so")     { it.into "sdk_lib/lib" }
 
   from("dist/opentelemetry_sdk_log4cxx.xml.template") { it.into "conf" }
   from("dist/install.${scriptExt}") { it.fileMode 0700 }
@@ -249,7 +232,7 @@ task assembleLibrary(type: Tar) {
   compression Compression.GZIP
 }
 
-// ---- NGINX (with dependency ordering) ----
+// ---- NGINX (unchanged functional flow, with dependency on stageLibrary) ----
 nginxSupportedVersions.each { nginxVersion ->
 
   task("downloadNginx${nginxVersion}", type: Download) {
@@ -268,13 +251,12 @@ nginxSupportedVersions.each { nginxVersion ->
     group       = 'OpenTelemetry module for Nginx'
     description = 'Run configure to generate the build files for OpenTelemetry Module for Nginx'
 
-    // Ensure the SDK is compiled and staged before configure
     dependsOn "extractNginx${nginxVersion}"
-    dependsOn stageLibrary
+    dependsOn stageLibrary   // ✅ ensure SDK .so/.a is staged before configure
 
     workingDir "${buildDir}/nginx-${nginxVersion}"
 
-    // Linker gets -L to the staged directory; optionally add rpath for runtime convenience
+    // -L path points to staged SDK; rpath helps at runtime
     commandLine './configure',
       "--with-compat",
       "--with-cc-opt=-Wno-error -Wno-unused-variable -Wno-unused-but-set-variable",
@@ -314,8 +296,7 @@ nginxSupportedVersions.each { nginxVersion ->
     outputs.file "${buildDir}/nginx-${nginxVersion}/objs/ngx_http_opentelemetry_module.so"
     workingDir "${buildDir}/nginx-${nginxVersion}"
 
-    // Verbose link line, helpful for diagnostics
-    commandLine 'make', 'V=1', 'modules'
+    commandLine 'make', 'modules'
   }
 
   task("stageNginxModule${nginxVersion}", type: Copy) {
