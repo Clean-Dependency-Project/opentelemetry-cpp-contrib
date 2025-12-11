@@ -67,11 +67,7 @@ RUN curl -o /usr/bin/gosu -SL "https://github.com/tianon/gosu/releases/download/
  && gosu nobody true
 
 # ---- CMake 3.20 (tarball install), as in your original ----
-RUN set -eux; \
-  wget "https://cmake.org/files/v${CMAKE_VERSION}/cmake-${CMAKE_0VERSION}-linux-x86_64.tar.gz"; \
-  tar -xvf "cmake-${CMAKE_0VERSION}-linux-x86_64.tar.gz"; \
-  cd "cmake-${CMAKE_0VERSION}-linux-x86_64" && cp -rf * /usr/local/; \
-  cd .. && rm -rf "cmake-${CMAKE_0VERSION}-linux-x86_64.tar.gz" "cmake-${CMAKE_0VERSION}-linux-x86_64"
+RUN apt-get update && apt-get install -y --no-install-recommends cmake && rm -rf /var/lib/apt/lists/*
 
 # ---- gRPC build (vendored deps) + Abseil patch for glibc 2.34+ ----
 RUN set -eux; \
