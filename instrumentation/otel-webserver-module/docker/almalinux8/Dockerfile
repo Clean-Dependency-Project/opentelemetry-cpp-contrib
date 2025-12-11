@@ -37,6 +37,7 @@ RUN groupadd -r swuser && useradd -u 1000 -g swuser -m -s /sbin/nologin -c "defa
 
 # ---- apt packages (Debian equivalents of your dnf list) ----
 ENV DEBIAN_FRONTEND=noninteractive
+
 RUN set -eux; \
   apt-get update; \
   apt-get install -y --no-install-recommends \
@@ -44,13 +45,12 @@ RUN set -eux; \
     build-essential pkg-config \
     bzip2 xz-utils \
     libssl-dev libffi-dev zlib1g-dev \
-    libpcre3-dev \
-    # Java (Debian ships newer OpenJDK; 17 works for Gradle)
-    openjdk-17-jdk \
-    # Apache (Debian: apache2). If not needed, you can remove it.
+    libpcre2-dev \
+    default-jdk \
     apache2 \
   ; \
   rm -rf /var/lib/apt/lists/*
+
 
 # ---- Python 2.7.18 (from source, as in your original) ----
 RUN set -eux; \
