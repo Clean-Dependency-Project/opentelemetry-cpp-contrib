@@ -4,8 +4,9 @@ on:
   push:
     branches: [ Alma ]
 
-webserver-build-test-almalinux8:
-  name: webserver-almalinux8-build
+jobs:
+  webserver-build-test-almalinux8:
+    name: webserver-almalinux8-build
     runs-on: ubuntu-20.04
     steps:
       - name: checkout otel webserver
