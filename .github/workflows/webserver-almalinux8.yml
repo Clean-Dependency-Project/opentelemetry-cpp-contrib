@@ -1,4 +1,4 @@
-name: webserver centos8
+name: webserver alma
 
 on:
   workflow_dispatch:
