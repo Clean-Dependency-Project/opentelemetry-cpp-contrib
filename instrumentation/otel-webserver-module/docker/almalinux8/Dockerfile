@@ -1,5 +1,5 @@
 
-FROM almalinux:9.4
+FROM almalinux:8.10
 
 
 ARG BUILD_NUMBER
@@ -91,7 +91,7 @@ RUN git clone https://github.com/grpc/grpc \
 RUN mkdir -p dependencies
 
 # install boost version 1.75.0
-RUN wget https://boostorg.jfrog.io/artifactory/main/release/${BOOST_VERSION}/source/${BOOST_FILENAME}_rc1.tar.gz \
+RUN wget wget https://archives.boost.io/release/${BOOST_VERSION}/source/${BOOST_FILENAME}_rc1.tar.gz \
     && tar -xvf ${BOOST_FILENAME}_rc1.tar.gz \
     && cd ${BOOST_FILENAME} \
     && ./bootstrap.sh --with-libraries=filesystem,system --prefix=/dependencies/boost/${BOOST_VERSION}/ \
