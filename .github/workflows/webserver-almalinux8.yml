@@ -1,7 +1,8 @@
 name: webserver alma
 
 on:
-  workflow_dispatch:
+  push:
+    branches: [ Alma ]
 
 webserver-build-test-almalinux8:
   name: webserver-almalinux8-build
