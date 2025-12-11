@@ -1,5 +1,5 @@
 
-FROM almalinux:8.10
+FROM almalinux:9.4
 
 
 ARG BUILD_NUMBER
