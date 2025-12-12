@@ -96,36 +96,38 @@ RUN wget https://boostorg.jfrog.io/artifactory/main/release/${BOOST_VERSION}/sou
     && ./b2 install define=BOOST_ERROR_CODE_HEADER_ONLY link=static threading=multi cxxflags="-fvisibility=hidden -fPIC" cflags="-fvisibility=hidden -fPIC" \
     && cd .. && rm -rf ${BOOST_FILENAME} && rm ${BOOST_FILENAME}_rc1.tar.gz
 
-#install Apr
-RUN mkdir -p dependencies/apr/${APR_VERSION} \
-    && wget https://archive.apache.org/dist/apr/apr-${APR_VERSION}.tar.gz --no-check-certificate \
-    && tar -xf apr-${APR_VERSION}.tar.gz \
-    && cd apr-${APR_VERSION} \
-    && ./configure --prefix=/dependencies/apr/${APR_VERSION} --enable-static=yes --enable-shared=no --with-pic && echo $? \
-    && make -j 6 \
-    && make install \
-    && cd ../ && rm -rf apr-${APR_VERSION} && rm -rf apr-${APR_VERSION}.tar.gz
+# ---- Expat (static) ----
+RUN set -eux; \
+  mkdir -p /dependencies/expat/${EXPAT_VERSION}; \
+  wget https://github.com/libexpat/libexpat/releases/download/${EXPAT_RVERSION}/expat-${EXPAT_VERSION}.tar.gz --no-check-certificate; \
+  tar -xf expat-${EXPAT_VERSION}.tar.gz; \
+  cd expat-${EXPAT_VERSION}; \
+  ./configure --prefix=/dependencies/expat/${EXPAT_VERSION} --enable-static=yes --enable-shared=no --with-pic; \
+  make -j"$(nproc)"; make install; \
+  cd ..; rm -rf expat-${EXPAT_VERSION}*
 
-# install libexpat
-RUN mkdir -p dependencies/expat/${EXPAT_VERSION} \
-    && wget https://github.com/libexpat/libexpat/releases/download/${EXPAT_RVERSION}/expat-${EXPAT_VERSION}.tar.gz --no-check-certificate \
-    && tar -xf expat-${EXPAT_VERSION}.tar.gz \
-    && cd expat-${EXPAT_VERSION} \
-    && ./configure --prefix=/dependencies/expat/${EXPAT_VERSION} --enable-static=yes --enable-shared=no --with-pic && echo $? \
-    && make -j 6 \
-    && make install \
-    && cd ../ && rm -rf expat-${EXPAT_VERSION} && rm -rf expat-${EXPAT_VERSION}.tar.gz
+# ---- APR-util (static) ----
+RUN set -eux; \
+  mkdir -p /dependencies/apr-util/${APRUTIL_VERSION}; \
+  wget https://archive.apache.org/dist/apr/apr-util-${APRUTIL_VERSION}.tar.gz --no-check-certificate; \
+  tar -xf apr-util-${APRUTIL_VERSION}.tar.gz; \
+  cd apr-util-${APRUTIL_VERSION}; \
+  ./configure --prefix=/dependencies/apr-util/${APRUTIL_VERSION} \
+    --enable-static=yes --enable-shared=no --with-pic \
+    --with-apr=/dependencies/apr/${APR_VERSION} \
+    --with-expat=/dependencies/expat/${EXPAT_VERSION}; \
+  make -j"$(nproc)"; make install; \
+  cd ..; rm -rf apr-util-${APRUTIL_VERSION}*
 
-# install Apr-util
-RUN mkdir -p dependencies/apr-util/${APRUTIL_VERSION} \
-    && wget https://archive.apache.org/dist/apr/apr-util-${APRUTIL_VERSION}.tar.gz --no-check-certificate \
-    && tar -xf apr-util-${APRUTIL_VERSION}.tar.gz \
-    && cd apr-util-${APRUTIL_VERSION} \
-    && ./configure --prefix=/dependencies/apr-util/${APRUTIL_VERSION} --enable-static=yes --enable-shared=no --with-pic --with-apr=/dependencies/apr/${APR_VERSION} --with-expat=/dependencies/expat/${EXPAT_VERSION} && echo $? \
-    && make -j 6 \
-    && make install \
-    && cd ../ && rm -rf apr-util-${APRUTIL_VERSION} && rm -rf apr-util-${APRUTIL_VERSION}.tar.gz
-
+# ---- libtool (host) ----
+RUN set -eux; \
+  wget --no-check-certificate https://ftpmirror.gnu.org/libtool/libtool-${LIBTOOL_VERSION}.tar.gz; \
+  tar xzf libtool-${LIBTOOL_VERSION}.tar.gz; \
+  cd libtool-${LIBTOOL_VERSION}; \
+  ./configure --prefix=/usr; \
+  make -j"$(nproc)"; make install; \
+  libtool --version; \
+  cd ..; rm -rf libtool-${LIBTOOL_VERSION}*
 
 # install autoconf
 RUN wget --no-check-certificate https://ftp.gnu.org/gnu/autoconf/autoconf-${AUTOCONF_VERSION}.tar.gz \
@@ -153,16 +155,19 @@ RUN wget --no-check-certificate https://ftpmirror.gnu.org/libtool/libtool-${LIBT
     && libtool --version \
     && cd .. && rm -rf libtool--${LIBTOOL_VERSION}.tar.gz
 
-#install log4cxx
-RUN mkdir -p dependencies/apache-log4cxx/${LOG4CXX_VERSION} \
-    && wget https://archive.apache.org/dist/logging/log4cxx/${LOG4CXX_VERSION}/apache-log4cxx-${LOG4CXX_VERSION}.tar.gz --no-check-certificate \
-    && tar -xf apache-log4cxx-${LOG4CXX_VERSION}.tar.gz \
-    && cd apache-log4cxx-${LOG4CXX_VERSION} \
-    && ./configure --prefix=/dependencies/apache-log4cxx/${LOG4CXX_VERSION}/ --enable-static=yes --enable-shared=no --with-pic --with-apr=/dependencies/apr/${APR_VERSION}/ --with-apr-util=/dependencies/apr-util/${APRUTIL_VERSION}/ && echo $? \
-    && make -j 6 ; echo 0 \
-    && automake --add-missing \
-    && make install \
-    && cd .. && rm -rf apache-log4cxx-${LOG4CXX_VERSION}.tar.gz && rm -rf apache-log4cxx-${LOG4CXX_VERSION}
+# ---- Apache log4cxx (static) ----
+RUN set -eux; \
+  mkdir -p /dependencies/apache-log4cxx/${LOG4CXX_VERSION}; \
+  wget https://archive.apache.org/dist/logging/log4cxx/${LOG4CXX_VERSION}/apache-log4cxx-${LOG4CXX_VERSION}.tar.gz --no-check-certificate; \
+  tar -xf apache-log4cxx-${LOG4CXX_VERSION}.tar.gz; \
+  cd apache-log4cxx-${LOG4CXX_VERSION}; \
+  autoreconf -fi; \
+  ./configure --prefix=/dependencies/apache-log4cxx/${LOG4CXX_VERSION}/ \
+    --enable-static=yes --enable-shared=no --with-pic \
+    --with-apr=/dependencies/apr/${APR_VERSION}/ \
+    --with-apr-util=/dependencies/apr-util/${APRUTIL_VERSION}/; \
+  make -j"$(nproc)"; make install; \
+  cd ..; rm -rf apache-log4cxx-${LOG4CXX_VERSION}*
 
 # install opentelemetry
 RUN mkdir -p dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/lib \
