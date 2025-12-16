@@ -73,6 +73,7 @@ ARG nginx_version=1.29.3
 
 # Minimal runtime deps for starting NGINX and fetching sources
 
+
 RUN set -eux; \
     apt-get update; \
     apt-get install --no-install-recommends --no-install-suggests -y \
@@ -82,8 +83,11 @@ RUN set -eux; \
       zlib1g-dev \
       libpcre2-dev \
       libprotobuf32t64 \
+      libc-bin \
     ; \
+    ldconfig; \
     rm -rf /var/lib/apt/lists/*
+
 
 
 COPY --from=build /otel-nginx/install/otel_ngx_module.so /otel-nginx/otel_ngx_module.so
