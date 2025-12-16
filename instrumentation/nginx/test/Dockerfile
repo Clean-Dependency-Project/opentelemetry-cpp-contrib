@@ -81,6 +81,7 @@ RUN set -eux; \
       build-essential \
       zlib1g-dev \
       libpcre2-dev \
+      libprotobuf32t64 \
     ; \
     rm -rf /var/lib/apt/lists/*
 
