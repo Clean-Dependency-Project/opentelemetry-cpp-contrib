@@ -6,7 +6,7 @@ on:
 jobs:
  webserver-build-test-ubuntu:
     name: webserver-ubuntu-build
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
     steps:
       - name: checkout otel webserver
         uses: actions/checkout@v4
