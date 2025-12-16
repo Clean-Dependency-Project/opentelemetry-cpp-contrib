@@ -15,7 +15,8 @@ RUN apt-get update && \
       libcurl4-openssl-dev \
       protobuf-compiler \
       libprotobuf-dev \
-      libpcre2-dev && \
+      libpcre2-dev \
+      libabsl-dev && \
     update-ca-certificates
 
 RUN git clone --shallow-submodules --depth 1 --recurse-submodules -b v$otel_cpp_version \
