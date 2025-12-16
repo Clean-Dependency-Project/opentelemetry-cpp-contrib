@@ -6,7 +6,17 @@ ARG otel_cpp_version=1.17.0
 ARG nginx_version=1.29.3
 
 RUN apt-get update && \
-    apt-get install --no-install-recommends --no-install-suggests -y git cmake build-essential curl libcurl4-openssl-dev protobuf-compiler libprotobuf-dev libpcre2-dev
+    apt-get install --no-install-recommends --no-install-suggests -y \
+      git \
+      cmake \
+      build-essential \
+      curl \
+      ca-certificates \
+      libcurl4-openssl-dev \
+      protobuf-compiler \
+      libprotobuf-dev \
+      libpcre2-dev && \
+    update-ca-certificates
 
 RUN git clone --shallow-submodules --depth 1 --recurse-submodules -b v$otel_cpp_version \
   https://github.com/open-telemetry/opentelemetry-cpp.git \
