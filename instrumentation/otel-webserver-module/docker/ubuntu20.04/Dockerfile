@@ -1,30 +1,40 @@
-FROM ubuntu:20.04
+FROM amazonlinux:2
 ENV DEBIAN_FRONTEND noninteractive
 
-RUN apt-get -y update && apt-get -y upgrade && apt-get -y dist-upgrade
-RUN apt-get install -qq -y --ignore-missing \
-	build-essential		                    \
-	curl			                        \
-	git			                            \
-	make			                        \
-	pkg-config		                        \
-	protobuf-compiler	                    \
-	libprotobuf-dev                         \
-	python			                        \
-	sudo			                        \
-	tar			                            \
-	zip			                            \
-	unzip			                        \
-	wget			                        \
-    cmake                                   
 
-RUN apt-get install -y \
-    lcov    \
-    m4                                      \
-    autoconf                                \
-    automake                                \
-    libtool                                 \
-    default-jre
+# Update system
+RUN yum -y update
+
+# Install core build tools and utilities
+RUN yum -y install \
+    gcc \
+    gcc-c++ \
+    make \
+    curl \
+    git \
+    pkgconfig \
+    protobuf \
+    protobuf-compiler \
+    protobuf-devel \
+    python3 \
+    sudo \
+    tar \
+    zip \
+    unzip \
+    wget \
+    cmake3
+
+# Install additional build utilities
+RUN yum -y install \
+    lcov \
+    m4 \
+    autoconf \
+    automake \
+    libtool \
+    java-11-openjdk-headless
+
+#
+
 
 # The following arguments would be passed from docker-compose.yml
 ARG GRPC_VERSION="1.36.4"
@@ -38,7 +48,7 @@ ARG APRUTIL_VERSION="1.6.1"
 ARG LOG4CXX_VERSION="0.11.0"
 ARG GTEST_VERSION="1.10.0"
 ARG PCRE_VERSION="8.44"
-ARG NGINX_VERSION="1.26.0"
+ARG NGINX_VERSION="1.29.3"
 
 # Install GRPC
 RUN git clone --shallow-submodules --depth 1 --recurse-submodules -b v${GRPC_VERSION} \
@@ -154,9 +164,11 @@ RUN rm -rf apr-util-${APRUTIL_VERSION} && rm -rf apr-util-${APRUTIL_VERSION}.tar
     && rm -rf grpc \
     && rm -rf apr-${APR_VERSION} && rm -rf apr-${APR_VERSION}.tar.gz
 
-RUN apt-get install libpcre3 libpcre3-dev -y
-RUN apt-get install apache2 -y && a2enmod proxy && a2enmod proxy_http \
-    && a2enmod proxy_balancer && a2enmod dav
+RUN yum -y install pcre pcre-devel
+
+RUN yum -y update && \
+    yum -y install httpd
+
 
 #Build and install boost
 RUN wget https://archives.boost.io/release/${BOOST_VERSION}/source/${BOOST_FILENAME}.tar.gz \
@@ -167,6 +179,7 @@ RUN wget https://archives.boost.io/release/${BOOST_VERSION}/source/${BOOST_FILEN
     && ./b2 install define=BOOST_ERROR_CODE_HEADER_ONLY link=static threading=multi cxxflags="-fvisibility=hidden -fPIC" cflags="-fvisibility=hidden -fPIC" \
     # && cd .. && rm -rf ${BOOST_FILENAME} && rm ${BOOST_FILENAME}_rc1.tar.gz
     && cd .. && rm -rf ${BOOST_FILENAME} && rm ${BOOST_FILENAME}.tar.gz
+
 # install pcre
 RUN mkdir -p dependencies/pcre/${PCRE_VERSION}/ \
     && wget https://ftp.exim.org/pub/pcre/pcre-${PCRE_VERSION}.tar.gz --no-check-certificate \
@@ -181,17 +194,17 @@ RUN wget http://nginx.org/download/nginx-${NGINX_VERSION}.tar.gz \
     && tar -xvf nginx-${NGINX_VERSION}.tar.gz -C /build-dependencies \
     && rm -rf nginx-${NGINX_VERSION}.tar.gz
 
-# Install Nginx stable version
-RUN apt install curl gnupg2 ca-certificates lsb-release ubuntu-keyring -y \
-    && curl https://nginx.org/keys/nginx_signing.key | gpg --dearmor \
-    | tee /usr/share/keyrings/nginx-archive-keyring.gpg >/dev/null \
-    && gpg --dry-run --quiet --import --import-options import-show /usr/share/keyrings/nginx-archive-keyring.gpg; exit 0
-RUN echo "deb [signed-by=/usr/share/keyrings/nginx-archive-keyring.gpg] \
-    http://nginx.org/packages/ubuntu `lsb_release -cs` nginx" \
-    | tee /etc/apt/sources.list.d/nginx.list \
-    && echo "Package: *\nPin: origin nginx.org\nPin: release o=nginx\nPin-Priority: 900\n" \
-    | tee /etc/apt/preferences.d/99nginx \
-    && apt update -y && apt install nginx -y
+# # Install Nginx stable version
+# RUN apt install curl gnupg2 ca-certificates lsb-release ubuntu-keyring -y \
+#     && curl https://nginx.org/keys/nginx_signing.key | gpg --dearmor \
+#     | tee /usr/share/keyrings/nginx-archive-keyring.gpg >/dev/null \
+#     && gpg --dry-run --quiet --import --import-options import-show /usr/share/keyrings/nginx-archive-keyring.gpg; exit 0
+# RUN echo "deb [signed-by=/usr/share/keyrings/nginx-archive-keyring.gpg] \
+#     http://nginx.org/packages/ubuntu `lsb_release -cs` nginx" \
+#     | tee /etc/apt/sources.list.d/nginx.list \
+#     && echo "Package: *\nPin: origin nginx.org\nPin: release o=nginx\nPin-Priority: 900\n" \
+#     | tee /etc/apt/preferences.d/99nginx \
+#     && apt update -y && apt install nginx -y
 
 # Build Webserver Module
 COPY . /otel-webserver-module
