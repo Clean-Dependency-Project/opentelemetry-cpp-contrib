@@ -72,14 +72,18 @@ FROM debian:13 AS run
 ARG nginx_version=1.29.3
 
 # Minimal runtime deps for starting NGINX and fetching sources
+
 RUN set -eux; \
     apt-get update; \
     apt-get install --no-install-recommends --no-install-suggests -y \
       ca-certificates \
       curl \
       build-essential \
+      zlib1g-dev \
+      libpcre2-dev \
     ; \
     rm -rf /var/lib/apt/lists/*
+
 
 COPY --from=build /otel-nginx/install/otel_ngx_module.so /otel-nginx/otel_ngx_module.so
 COPY test/conf/nginx.conf /otel-nginx/nginx.conf
