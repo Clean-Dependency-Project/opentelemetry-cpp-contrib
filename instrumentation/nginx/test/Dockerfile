@@ -1,5 +1,5 @@
 
-# Use Debian 13 (Trixie) as the build base
+ARG image=debian:trixie
 FROM $image AS build
 
 ARG otel_cpp_version=1.17.0
