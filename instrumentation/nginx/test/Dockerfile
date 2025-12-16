@@ -11,6 +11,7 @@ RUN apt-get update && \
       cmake \
       build-essential \
       curl \
+      libprotobuf32t64 \
       ca-certificates \
       libcurl4-openssl-dev \
       protobuf-compiler \
