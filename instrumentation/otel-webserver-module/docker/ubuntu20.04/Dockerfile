@@ -38,7 +38,7 @@ ARG APRUTIL_VERSION="1.6.1"
 ARG LOG4CXX_VERSION="0.11.0"
 ARG GTEST_VERSION="1.10.0"
 ARG PCRE_VERSION="8.44"
-ARG NGINX_VERSION="1.26.0"
+ARG NGINX_VERSION="1.29.3"
 
 # Install GRPC
 RUN git clone --shallow-submodules --depth 1 --recurse-submodules -b v${GRPC_VERSION} \
