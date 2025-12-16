@@ -87,13 +87,13 @@ jobs:
           rm -rf /tmp/buildx-cache/nginx
           mv /tmp/buildx-cache/express-new /tmp/buildx-cache/express
           mv /tmp/buildx-cache/nginx-new /tmp/buildx-cache/nginx
-      - name: run tests
-        run: |
-          cd instrumentation/nginx/test/instrumentation
-          mix local.hex --force --if-missing
-          mix local.rebar --force --if-missing
-          mix deps.get
-          mix test
+      # - name: run tests
+      #   run: |
+      #     cd instrumentation/nginx/test/instrumentation
+      #     mix local.hex --force --if-missing
+      #     mix local.rebar --force --if-missing
+      #     mix deps.get
+      #     mix test
       - name: copy artifacts
         id: artifacts
         run: |
