@@ -63,8 +63,8 @@ project.ext {
   LCOV_RAW_INFO     = "${COVERAGE_DIR}/lcov-raw.info"
   LCOV_INFO         = "${COVERAGE_DIR}/lcov.info"
 
-  BOOST_INCLUDE     = "${platBuildDir}/boost/1.75.0/include"
-  BOOST_LIB         = "${platBuildDir}/boost/1.75.0/lib/libboost_filesystem.a ${platBuildDir}/boost/1.75.0/lib/libboost_system.a"
+  BOOST_INCLUDE     = "${modDepDir}/boost/1.75.0/include"
+  BOOST_LIB         = "${modDepDir}/boost/1.75.0/lib/libboost_filesystem.a ${modDepDir}/boost/1.75.0/lib/libboost_system.a"
 
   // Versions baked into the Docker image; used by build.gyp via env expansion
   APR_VERSION       = "1.7.6"
