@@ -204,8 +204,7 @@ RUN set -eux; \
   # Remove all files from sdk_lib/lib except .so files
   find "${SDK_LIB_DIR}" -type f ! -name '*.so' -delete; \
 
-  cp -v /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/lib/libopentelemetry_*.so "${SDK_LIB_DIR}/" || true; \
-  cp -v /usr/local/lib/libopentelemetry_*.so "${SDK_LIB_DIR}/" || true;
+  # Only keep .so files moved above; do not copy extra .so files back into sdk_lib/lib
 
 COPY entrypoint.sh /usr/local/bin/
 ENTRYPOINT ["entrypoint.sh"]
