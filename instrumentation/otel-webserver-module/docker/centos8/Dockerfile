@@ -198,8 +198,6 @@ RUN set -eux; \
   TP_LIB_DIR="${SDK_ROOT}/third_party/lib"; \
   cp -v /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/lib/libopentelemetry_*.so "${SDK_LIB_DIR}/" || true; \
   cp -v /usr/local/lib/libopentelemetry_*.so "${SDK_LIB_DIR}/" || true; \
-  
-RUN mkdir -p "${TP_LIB_DIR}"; \
   # No module-dependencies or out directories used
 
 # ---- Create installer (keep $ORIGIN RPATH; no global ldconfig) ----
