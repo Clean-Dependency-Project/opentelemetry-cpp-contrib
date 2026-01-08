@@ -195,6 +195,8 @@ RUN set -eux; \
   mkdir -p "${SDK_ROOT}/sdk_lib/lib" "${SDK_ROOT}/third_party/lib"; \
   SDK_LIB_DIR="${SDK_ROOT}/sdk_lib/lib"; \
   TP_LIB_DIR="${SDK_ROOT}/third_party/lib"; \
+  cp -v /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/lib/libopentelemetry_*.so "${SDK_LIB_DIR}/" || true; \
+  cp -v /usr/local/lib/libopentelemetry_*.so "${SDK_LIB_DIR}/" || true; \
 
   # Move libopenetlemetry_webserver.so from build output to sdk_lib/lib
   if [ -f "${SDK_ROOT}/sdk_lib/lib/out/Default/libopenetlemetry_webserver.so" ]; then \
