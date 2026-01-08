@@ -30,7 +30,6 @@
       'core/sdkwrapper/SdkHelperFactory.cpp',
       'core/sdkwrapper/ScopedSpan.cpp',
       'core/sdkwrapper/ServerSpan.cpp',
-          'product_dir': '../../sdk_lib/lib',
       'core/sdkwrapper/SdkWrapper.cpp',
       'util/SpanNamingUtils.cpp',
       'util/RegexResolver.cpp'
