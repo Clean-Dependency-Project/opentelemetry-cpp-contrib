@@ -199,40 +199,7 @@ RUN set -eux; \
   cp -v /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/lib/libopentelemetry_*.so "${SDK_LIB_DIR}/" || true; \
   cp -v /usr/local/lib/libopentelemetry_*.so "${SDK_LIB_DIR}/" || true; \
   mkdir -p "${TP_LIB_DIR}"; \
-  for LIB in \
-    "${SDK_LIB_DIR}/libopentelemetry_exporter_otlp_grpc_client.so" \
-    "${SDK_LIB_DIR}/libopentelemetry_exporter_otlp_grpc.so" \
-    "${SDK_LIB_DIR}/libopentelemetry_proto.so" \
-    "${SDK_LIB_DIR}/libopentelemetry_logs.so" \
-    "${SDK_LIB_DIR}/libopentelemetry_metrics.so" \
-  ; do \
-    if [ -f "${LIB}" ]; then \
-      echo "Resolving transitive deps for: ${LIB}"; \
-      ldd "${LIB}" \
-        | awk '/=>/ && $3 ~ /^\// {print $3} !/=>/ {for(i=1;i<=NF;i++) if($i ~ /^\//) print $i}' \
-        | sort -u \
-        | grep -Ev '/ld-linux-x86-64\.so\.2$\
-/libc\.so\.6$\
-/libm\.so\.6$\
-/libpthread\.so\.[0-9]+$\
-/libdl\.so\.[0-9]+$\
-/librt\.so\.[0-9]+$\
-/libresolv\.so\.[0-9]+$\
-/libnsl\.so\.[0-9]+$\
-/libgcc_s\.so\.[0-9]+$\
-/libstdc\+\+\.so\.[0-9]+$\
-/libssl\.so\.[0-9]+$\
-/libcrypto\.so\.[0-9]+$' \
-        | xargs -r -I{} cp -v {} "${TP_LIB_DIR}/"; \
-    fi; \
-  done; \
-  if [ -f "${TP_LIB_DIR}/libgrpc++.so.1.51.1" ] && [ ! -f "${TP_LIB_DIR}/libgrpc++.so.1.51" ]; then \
-    ln -sv "${TP_LIB_DIR}/libgrpc++.so.1.51.1" "${TP_LIB_DIR}/libgrpc++.so.1.51"; \
-  fi; \
-  if ls "${TP_LIB_DIR}"/libprotobuf.so.32* >/dev/null 2>&1; then \
-    [ -f "${TP_LIB_DIR}/libprotobuf.so.32" ] || \
-      ln -sv "$(ls -1 ${TP_LIB_DIR}/libprotobuf.so.32* | head -n1)" "${TP_LIB_DIR}/libprotobuf.so.32"; \
-  fi
+  # No module-dependencies or out directories used
 
 # ---- Create installer (keep $ORIGIN RPATH; no global ldconfig) ----
 RUN set -eux; \
