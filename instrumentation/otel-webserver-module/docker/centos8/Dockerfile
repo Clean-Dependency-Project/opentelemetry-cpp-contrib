@@ -198,38 +198,38 @@ RUN set -eux; \
   TP_LIB_DIR="${SDK_ROOT}/third_party/lib"; \
   cp -v /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/lib/libopentelemetry_*.so "${SDK_LIB_DIR}/" || true; \
   cp -v /usr/local/lib/libopentelemetry_*.so "${SDK_LIB_DIR}/" || true; \
-  # No module-dependencies or out directories used
+#   # No module-dependencies or out directories used
 
-# ---- Create installer (keep $ORIGIN RPATH; no global ldconfig) ----
-RUN set -eux; \
-  SDK_ROOT="/opt/opentelemetry-webserver-sdk"; \
-  cat > "${SDK_ROOT}/install.sh" <<'EOF'
-#!/usr/bin/env bash
-set -euo pipefail
-# No global ldconfig; module relies on $ORIGIN-based RPATH.
-echo "OpenTelemetry Webserver SDK installed."
-EOF
+# # ---- Create installer (keep $ORIGIN RPATH; no global ldconfig) ----
+# RUN set -eux; \
+#   SDK_ROOT="/opt/opentelemetry-webserver-sdk"; \
+#   cat > "${SDK_ROOT}/install.sh" <<'EOF'
+# #!/usr/bin/env bash
+# set -euo pipefail
+# # No global ldconfig; module relies on $ORIGIN-based RPATH.
+# echo "OpenTelemetry Webserver SDK installed."
+# EOF
 RUN chmod +x "/opt/opentelemetry-webserver-sdk/install.sh"
 
-# ---- Post-install + RPATH + sanity + re-pack ----
-RUN set -eux; \
-  SDK_ROOT="/opt/opentelemetry-webserver-sdk"; \
-  SDK_LIB_DIR="${SDK_ROOT}/sdk_lib/lib"; \
-  TP_LIB_DIR="${SDK_ROOT}/third_party/lib"; \
-  patchelf --set-rpath '$ORIGIN/../sdk_lib/lib:$ORIGIN/../third_party/lib' \
-    "${SDK_ROOT}/WebServerModule/Nginx/${NGINX_VERSION}/ngx_http_opentelemetry_module.so"; \
-  patchelf --print-rpath \
-    "${SDK_ROOT}/WebServerModule/Nginx/${NGINX_VERSION}/ngx_http_opentelemetry_module.so"; \
-  test -f "${SDK_LIB_DIR}/libopentelemetry_exporter_otlp_grpc_client.so" || \
-    (echo "ERROR: missing libopentelemetry_exporter_otlp_grpc_client.so in ${SDK_LIB_DIR}" && ls -l "${SDK_LIB_DIR}" && exit 1); \
-  cd "${SDK_ROOT}/.."; \
-  mkdir -p /otel-webserver-module/build; \
-  tar -czf /otel-webserver-module/build/opentelemetry-webserver-sdk-x64-linux.tgz \
-    opentelemetry-webserver-sdk; \
-  echo "=== Bundled SDK libs (sdk_lib/lib) ==="; \
-  ls -l "${SDK_LIB_DIR}" || true; \
-  echo "=== Bundled third-party libs (third_party/lib) ==="; \
-  ls -l "${TP_LIB_DIR}" || true
+# # ---- Post-install + RPATH + sanity + re-pack ----
+# RUN set -eux; \
+#   SDK_ROOT="/opt/opentelemetry-webserver-sdk"; \
+#   SDK_LIB_DIR="${SDK_ROOT}/sdk_lib/lib"; \
+#   TP_LIB_DIR="${SDK_ROOT}/third_party/lib"; \
+#   patchelf --set-rpath '$ORIGIN/../sdk_lib/lib:$ORIGIN/../third_party/lib' \
+#     "${SDK_ROOT}/WebServerModule/Nginx/${NGINX_VERSION}/ngx_http_opentelemetry_module.so"; \
+#   patchelf --print-rpath \
+#     "${SDK_ROOT}/WebServerModule/Nginx/${NGINX_VERSION}/ngx_http_opentelemetry_module.so"; \
+#   test -f "${SDK_LIB_DIR}/libopentelemetry_exporter_otlp_grpc_client.so" || \
+#     (echo "ERROR: missing libopentelemetry_exporter_otlp_grpc_client.so in ${SDK_LIB_DIR}" && ls -l "${SDK_LIB_DIR}" && exit 1); \
+#   cd "${SDK_ROOT}/.."; \
+#   mkdir -p /otel-webserver-module/build; \
+#   tar -czf /otel-webserver-module/build/opentelemetry-webserver-sdk-x64-linux.tgz \
+#     opentelemetry-webserver-sdk; \
+#   echo "=== Bundled SDK libs (sdk_lib/lib) ==="; \
+#   ls -l "${SDK_LIB_DIR}" || true; \
+#   echo "=== Bundled third-party libs (third_party/lib) ==="; \
+#   ls -l "${TP_LIB_DIR}" || true
 
 # ---- Optional: ldd module check ----
 RUN set -eux; \
