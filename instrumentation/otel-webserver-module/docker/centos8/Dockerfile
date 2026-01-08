@@ -209,7 +209,7 @@ RUN set -eux; \
 # # No global ldconfig; module relies on $ORIGIN-based RPATH.
 # echo "OpenTelemetry Webserver SDK installed."
 # EOF
-RUN chmod +x "/opt/opentelemetry-webserver-sdk/install.sh"
+# RUN chmod +x "/opt/opentelemetry-webserver-sdk/install.sh"
 
 # # ---- Post-install + RPATH + sanity + re-pack ----
 # RUN set -eux; \
