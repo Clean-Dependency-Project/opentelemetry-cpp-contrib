@@ -232,9 +232,9 @@ RUN set -eux; \
 #   ls -l "${TP_LIB_DIR}" || true
 
 # ---- Optional: ldd module check ----
-RUN set -eux; \
-  echo "==== ldd check (NGINX OTEL module) ===="; \
-  ldd "/opt/opentelemetry-webserver-sdk/WebServerModule/Nginx/${NGINX_VERSION}/ngx_http_opentelemetry_module.so" || true
+# RUN set -eux; \
+#   echo "==== ldd check (NGINX OTEL module) ===="; \
+#   ldd "/opt/opentelemetry-webserver-sdk/WebServerModule/Nginx/${NGINX_VERSION}/ngx_http_opentelemetry_module.so" || true
 
 # ---- Entrypoint (builder stage only) ----
 COPY entrypoint.sh /usr/local/bin/
