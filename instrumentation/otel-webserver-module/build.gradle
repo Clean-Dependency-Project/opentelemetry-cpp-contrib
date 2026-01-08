@@ -189,11 +189,7 @@ task stageLibrary(type: Copy) {
   // Scripts
   from("dist/runSDKProxy.sh") { it.fileMode 0770 }
 
-  // ✅ Robust: copy the SDK lib (.so OR .a) from wherever gyp/make placed it
-  from(fileTree("${platBuildDir}").matching {
-    include "**/libopentelemetry_webserver_sdk.so"
-    include "**/libopentelemetry_webserver_sdk.a"
-  }) {
+  from("${platBuildDir}/out/Default/libopentelemetry_webserver_sdk.so") {
     it.into "sdk_lib/lib"
   }
 
