@@ -202,7 +202,7 @@ RUN set -eux; \
   fi; \
 
   # Remove all files from sdk_lib/lib except .so files
-  find "${SDK_LIB_DIR}" -type f ! -name '*.so' -delete; \
+  find "${SDK_LIB_DIR}" -type f ! -name '*.so' -delete;
 
   # Only keep .so files moved above; do not copy extra .so files back into sdk_lib/lib
 
