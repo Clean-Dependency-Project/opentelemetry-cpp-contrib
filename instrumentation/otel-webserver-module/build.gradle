@@ -189,15 +189,15 @@ task stageLibrary(type: Copy) {
   // Scripts
   from("dist/runSDKProxy.sh") { it.fileMode 0770 }
 
-//   // ✅ Robust: copy the SDK lib (.so OR .a) from wherever gyp/make placed it
-//   from(fileTree("${platBuildDir}").matching {
-//     include "**/libopentelemetry_webserver_sdk.so"
-//     include "**/libopentelemetry_webserver_sdk.a"
-//   }) {
-//     it.into "sdk_lib/lib"
-//   }
+  // ✅ Robust: copy the SDK lib (.so OR .a) from wherever gyp/make placed it
+  from(fileTree("${platBuildDir}").matching {
+    include "**/libopentelemetry_webserver_sdk.so"
+    include "**/libopentelemetry_webserver_sdk.a"
+  }) {
+    it.into "sdk_lib/lib"
+  }
 
-  from(buildLibrary) { it.into "sdk_lib/lib" }
+  // from(buildLibrary) { it.into "sdk_lib/lib" }
 
   // Other dependent SDK shared libraries
   from("${modDepDir}/opentelemetry/${cppSDKVersion}/lib/libopentelemetry_common.so")                 { it.into "sdk_lib/lib" }
