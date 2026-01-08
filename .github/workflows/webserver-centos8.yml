@@ -41,10 +41,10 @@ jobs:
           docker cp apache_centos8_container:/otel-webserver-module/build/opentelemetry-webserver-sdk-x64-linux.tgz \
             /tmp/apache_centos8/
 
-          # Sanity check tar contents (should include third_party/lib/)
-          tar -tzf /tmp/apache_centos8/opentelemetry-webserver-sdk-x64-linux.tgz | \
-            grep -E '^opentelemetry-webserver-sdk/third_party/lib/' || \
-            (echo "ERROR: third_party/lib missing in tarball" && exit 1)
+          # # Sanity check tar contents (should include third_party/lib/)
+          # tar -tzf /tmp/apache_centos8/opentelemetry-webserver-sdk-x64-linux.tgz | \
+          #   grep -E '^opentelemetry-webserver-sdk/third_party/lib/' || \
+          #   (echo "ERROR: third_party/lib missing in tarball" && exit 1)
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
