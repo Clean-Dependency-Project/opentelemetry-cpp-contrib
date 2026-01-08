@@ -62,8 +62,8 @@ project.ext {
   LCOV_RAW_INFO     = "${COVERAGE_DIR}/lcov-raw.info"
   LCOV_INFO         = "${COVERAGE_DIR}/lcov.info"
 
-  BOOST_INCLUDE     = "${modDepDir}/boost/1.75.0/include"
-  BOOST_LIB         = "${modDepDir}/boost/1.75.0/lib/libboost_filesystem.a ${modDepDir}/boost/1.75.0/lib/libboost_system.a"
+  BOOST_INCLUDE     = "${platBuildDir}/boost/1.75.0/include"
+  BOOST_LIB         = "${platBuildDir}/boost/1.75.0/lib/libboost_filesystem.a ${platBuildDir}/boost/1.75.0/lib/libboost_system.a"
 
   // Versions baked into the Docker image; used by build.gyp via env expansion
   APR_VERSION       = "1.7.6"
@@ -125,7 +125,7 @@ task gypLibrary(type: Exec) {
   // Environment for gyp + later build steps (make/ninja)
   ext.libraryBuildEnvironment = [
     ARCH_FLAG        : gccArchFlag,
-    ANSDK_DIR        : modDepDir,
+  ANSDK_DIR        : platBuildDir,
     COMPILER_FLAGS   : (coverageEnabled) ? coverageCompilerFlags : '',
     LINKER_FLAGS     : (coverageEnabled) ? coverageLinkerFlags : '',
     BOOST_LIB        : BOOST_LIB,
@@ -353,7 +353,7 @@ task gypUnitTest(type: Exec) {
 
   ext.testBuildEnvironment = [
     OTEL_SDK_LIB_DIR : "${libraryStageDir}/sdk_lib",
-    ANSDK_DIR        : modDepDir,
+  ANSDK_DIR        : platBuildDir,
     BOOST_LIB        : BOOST_LIB,
     BOOST_INCLUDE    : BOOST_INCLUDE,
     LIBRARY_FLAGS    : libraryFlags,
