@@ -1,21 +1,24 @@
+
 {
   'targets': [{
     'target_name': 'opentelemetry_webserver_sdk',
     'type': 'shared_library',
 
+    # Common defines
     'defines': ['TIMER_USE_CGT'],
 
+    # macOS/Xcode block retained for parity
     'xcode_settings': {
       'OTHER_CFLAGS': [
         '-std=c++14',
         '-g',
         '-Wno-deprecated-register',
-        #'-fvisibility=hidden -fvisibility-inlines-hidden -pthread -fPIC'
         '-pthread -fPIC'
       ],
       'OTHER_LDFLAGS': ['-lpthread -ldl -lz -stdlib=libstdc++']
     },
 
+    # Project sources
     'sources': [
       'core/api/WSAgent.cpp',
       'core/api/RequestProcessingEngine.cpp',
@@ -33,49 +36,84 @@
     ],
 
     'conditions': [
+      # ============================
+      # Linux
+      # ============================
       ['OS=="linux"', {
+        'defines': [
+          'LOG4CXX_STATIC',   # static log4cxx build
+        ],
+
         'cflags': [
           '$(COMPILER_FLAGS)',
-          '-pthread -fPIC',
+          '-pthread',
+          '-fPIC',
           '-std=c++14',
           '-g',
-          '-O1 -D_FORTIFY_SOURCE=1',
+          '-O1',
+          '-D_FORTIFY_SOURCE=1',
         ],
 
-        'library_dirs': [
-        ],
-        'libraries': [
-          '$(ANSDK_DIR)/apr/1.7.0/lib/libapr-1.a',
-          '$(ANSDK_DIR)/apr-util/1.6.1/lib/libaprutil-1.a',
-          '$(ANSDK_DIR)/expat/2.3.0/lib/libexpat.a',
-          '$(ANSDK_DIR)/apache-log4cxx/0.11.0/lib/liblog4cxx.a',
-          '$(ANSDK_DIR)/opentelemetry/$(CPP_SDK_VERSION)/lib/libopentelemetry_common.so',
-          '$(ANSDK_DIR)/opentelemetry/$(CPP_SDK_VERSION)/lib/libopentelemetry_resources.so',
-          '$(ANSDK_DIR)/opentelemetry/$(CPP_SDK_VERSION)/lib/libopentelemetry_trace.so',
-          '$(ANSDK_DIR)/opentelemetry/$(CPP_SDK_VERSION)/lib/libopentelemetry_otlp_recordable.so',
-          '$(ANSDK_DIR)/opentelemetry/$(CPP_SDK_VERSION)/lib/libopentelemetry_exporter_ostream_span.so',
-          '$(ANSDK_DIR)/opentelemetry/$(CPP_SDK_VERSION)/lib/libopentelemetry_exporter_otlp_grpc.so',
-          '$(BOOST_LIB)',
-          '$(LINKER_FLAGS)',
-          '$(LIBRARY_FLAGS)',
-        ],
-
+        # Headers
         'include_dirs': [
           '../linux-fixed-headers',
-          '$(ANSDK_DIR)/apache-log4cxx/0.11.0/include',
+          '$(ANSDK_DIR)/apache-log4cxx/$(LOG4CXX_VERSION)/include',
           '../include/util',
           '../include/core',
           '$(ANSDK_DIR)/opentelemetry/$(CPP_SDK_VERSION)/include/',
-          '$(BOOST_INCLUDE)'
+          '$(BOOST_INCLUDE)',
         ],
 
+        # Library search paths -> translated to -L...
+        'library_dirs': [
+          '$(ANSDK_DIR)/apache-log4cxx/$(LOG4CXX_VERSION)/lib',
+          '$(ANSDK_DIR)/apr-util/$(APRUTIL_VERSION)/lib',
+          '$(ANSDK_DIR)/apr/$(APR_VERSION)/lib',
+          '$(ANSDK_DIR)/expat/$(EXPAT_VERSION)/lib',
+          # OpenTelemetry C++ SDK libs
+          '$(ANSDK_DIR)/opentelemetry/$(CPP_SDK_VERSION)/lib',
+        ],
+
+        # Final link settings (order matters).
+        'link_settings': {
+          'libraries': [
+            # --- Static libs (use a group to resolve mutual refs)
+            '-Wl,--start-group',
+            '-llog4cxx',
+            '-laprutil-1',
+            '-lapr-1',
+            '-lexpat',
+            '-Wl,--end-group',
+
+            # --- OpenTelemetry SDK shared libs used by your code
+            # TracerProvider, BatchSpanProcessor, RandomIdGenerator, Resource::Create, etc.
+            '-Wl,--start-group',
+            '-lopentelemetry_common',
+            '-lopentelemetry_resources',
+            '-lopentelemetry_trace',
+            '-lopentelemetry_otlp_recordable',
+            '-lopentelemetry_exporter_ostream_span',
+            '-lopentelemetry_exporter_otlp_grpc',
+            '-Wl,--end-group',
+
+            # Your existing Boost static libs and flags
+            '$(BOOST_LIB)',
+            '$(LINKER_FLAGS)',
+            '$(LIBRARY_FLAGS)',
+          ],
+        },
+
+        # Additional linker flags
         'ldflags': [
           '-Wl,--exclude-libs=ALL',
           '-Wl,--gc-sections',
           '-Wl,-z,defs',
-        ]
-     }],
+        ],
+      }],
 
+      # ============================
+      # Windows (unchanged from your file)
+      # ============================
       ['OS=="win"', {
         'default_configuration': 'Debug_x64',
         'configurations': {
@@ -166,7 +204,7 @@
         'defines': [
           'LOG4CXX_STATIC',
           'ZMQ_STATIC',
-          'BOOST_NO_CXX14_TEMPLATE_ALIASES',
+          'BOOST_NO_CXX11_TEMPLATE_ALIASES',
           'GOOGLE_PROTOBUF_NO_RTTI'
         ],
 
@@ -185,4 +223,3 @@
     ]
   }]
 }
-
