@@ -410,7 +410,7 @@ model {
             }
 
             if (toolChain in Clang || toolChain in Gcc) {
-                cppCompiler.args "-Wall", "-std=c++11", "-g"
+                cppCompiler.args "-Wall", "-std=c++14", "-g"
 
                 if (buildType == buildTypes.debug) {
                     cppCompiler.args "-g"

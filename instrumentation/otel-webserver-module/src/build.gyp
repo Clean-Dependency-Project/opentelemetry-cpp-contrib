@@ -7,7 +7,7 @@
 
     'xcode_settings': {
       'OTHER_CFLAGS': [
-        '-std=c++11',
+        '-std=c++14',
         '-g',
         '-Wno-deprecated-register',
         #'-fvisibility=hidden -fvisibility-inlines-hidden -pthread -fPIC'
@@ -37,7 +37,7 @@
         'cflags': [
           '$(COMPILER_FLAGS)',
           '-pthread -fPIC',
-          '-std=c++11',
+          '-std=c++14',
           '-g',
           '-O1 -D_FORTIFY_SOURCE=1',
         ],
@@ -166,7 +166,7 @@
         'defines': [
           'LOG4CXX_STATIC',
           'ZMQ_STATIC',
-          'BOOST_NO_CXX11_TEMPLATE_ALIASES',
+          'BOOST_NO_CXX14_TEMPLATE_ALIASES',
           'GOOGLE_PROTOBUF_NO_RTTI'
         ],
 
