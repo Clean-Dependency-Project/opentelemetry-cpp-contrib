@@ -383,47 +383,6 @@ task runUnitTest(type: Exec) {
 }
 
 
-
-// Code Coverage
-
-
-task lcov(type: Exec) {
-  group = 'Code Coverage'
-  description = 'remove noise from captured coverage info'
-
-  dependsOn lcovCapture
-
-  ext.tracefile = file(LCOV_INFO)
-
-  inputs.file lcovCapture.tracefile
-  outputs.file tracefile
-
-  executable 'lcov'
-  args '--quiet',                         // do not print progress messages
-        '--output-file', tracefile,       // resulting tracefile
-       '--remove', lcovCapture.tracefile, // remove files matching patterns from tracefile
-       '*/prebuilt/*', '*.pb.*', '/opt/rh/*', '/usr/include/*', '*.h', '*.hpp'  // list of patterns
-}
-
-task coverageHtml(type: Exec) {
-  group = 'Code Coverage'
-  description = 'generate html coverage report'
-
-  dependsOn lcov
-
-  inputs.file lcov.tracefile
-  outputs.dir COVERAGE_DIR
-
-  executable 'genhtml'
-  args '--quiet',                           // do not print progress messages
-       '--output-directory', COVERAGE_DIR,  // write HTML to this directory
-       '--show-details',                    // generate detailed directory view
-       '--keep-descriptions',               // do not remove unused test descriptions
-       '--title', project.name,             // display the specified title in header of all pages
-       '--demangle-cpp',                    // show user-friendly function names
-       lcov.tracefile
-}
-
 model {
     buildTypes {
         debug
@@ -449,7 +408,7 @@ model {
             }
 
             if (toolChain in Clang || toolChain in Gcc) {
-                cppCompiler.args "-Wall", "-std=c++11", "-g"
+                cppCompiler.args "-Wall", "-std=c++14", "-g"
 
                 if (buildType == buildTypes.debug) {
                     cppCompiler.args "-g"
