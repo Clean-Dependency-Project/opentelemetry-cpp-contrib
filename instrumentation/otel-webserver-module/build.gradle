@@ -235,7 +235,6 @@ nginxSupportedVersions.each { nginxVersion ->
     group = 'OpenTelemetry module for Nginx'
     description = 'Run configure to generate the build files for OpenTelemetry Module for Nginx'
 
-    // IMPORTANT: SDK must exist before configure
     dependsOn "extractNginx${nginxVersion}"
     dependsOn stageLibrary
 
@@ -247,7 +246,6 @@ nginxSupportedVersions.each { nginxVersion ->
           --with-cc-opt="-Wno-error -Wno-unused-variable -Wno-unused-but-set-variable" \
           --with-ld-opt="-L${libraryStageDir}/sdk_lib/lib" \
           --with-ld-opt="-Wl,-rpath,${libraryStageDir}/sdk_lib/lib" \
-          --with-ld-opt="-lopentelemetry_webserver_sdk" \
           --add-dynamic-module=${projectDir}/src/nginx
     """
     }
