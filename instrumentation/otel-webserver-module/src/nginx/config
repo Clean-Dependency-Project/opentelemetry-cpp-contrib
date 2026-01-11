@@ -1,5 +1,7 @@
 ngx_addon_name=ngx_http_opentelemetry_module
 
+SDK_LIB_DIR="/otel-webserver-module/build/linux-x64/opentelemetry-webserver-sdk/sdk_lib/lib"
+
 if test -n "$ngx_module_link"; then
     ngx_module_type=HTTP
     ngx_module_name=ngx_http_opentelemetry_module
@@ -8,8 +10,11 @@ if test -n "$ngx_module_link"; then
         $ngx_addon_dir/ngx_http_opentelemetry_log.c \
         $ngx_addon_dir/ngx_http_opentelemetry_module.c"
 
-    # 🔑 REQUIRED for dynamic module linking
-    ngx_module_libs="$ngx_module_libs -lopentelemetry_webserver_sdk"
+    # 🔑 REQUIRED: link + search path + runtime path
+    ngx_module_libs="$ngx_module_libs \
+        -L${SDK_LIB_DIR} \
+        -lopentelemetry_webserver_sdk \
+        -Wl,-rpath,${SDK_LIB_DIR}"
 
     . auto/module
 else
