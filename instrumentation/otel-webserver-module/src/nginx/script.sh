@@ -3,17 +3,18 @@ set -e
 
 file="$1"
 
-SDK_FLAGS="\
- -L/otel-webserver-module/build/linux-x64/opentelemetry-webserver-sdk/sdk_lib/lib \
- -lopentelemetry_webserver_sdk \
- -Wl,-rpath,/otel-webserver-module/build/linux-x64/opentelemetry-webserver-sdk/sdk_lib/lib"
+SDK_LINES="\\
+\t-L/otel-webserver-module/build/linux-x64/opentelemetry-webserver-sdk/sdk_lib/lib \\
+\t-lopentelemetry_webserver_sdk \\
+\t-Wl,-rpath,/otel-webserver-module/build/linux-x64/opentelemetry-webserver-sdk/sdk_lib/lib"
 
-echo "Patching module link command in $file"
+echo "Patching module link rule in $file"
 
-sed -i "/\\$(LINK) -o objs\\/ngx_http_opentelemetry_module.so/ s|$|${SDK_FLAGS}|" "$file"
+# Insert SDK flags as new continuation lines AFTER the object list
+sed -i "/cc -o objs\\/ngx_http_opentelemetry_module.so/ a ${SDK_LINES}" "$file"
 
-# hard verification
+# Verify
 grep -n "lopentelemetry_webserver_sdk" "$file" || {
-  echo "ERROR: SDK not linked into module"
+  echo "ERROR: SDK flags not injected"
   exit 1
 }
