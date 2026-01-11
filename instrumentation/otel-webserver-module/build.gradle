@@ -276,7 +276,7 @@ nginxSupportedVersions.each { nginxVersion ->
 
         dependsOn "configureNginx${nginxVersion}"
         dependsOn stageLibrary
-        dependsOn "updateMakefile${nginxVersion}"
+        //dependsOn "updateMakefile${nginxVersion}"
 
         outputs.file "${buildDir}/nginx-${nginxVersion}/objs/ngx_http_opentelemetry_module.so"
         workingDir "${buildDir}/nginx-${nginxVersion}"
