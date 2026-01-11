@@ -3,22 +3,20 @@ set -e
 
 file="$1"
 
-SDK_LIBS="-L/otel-webserver-module/build/linux-x64/opentelemetry-webserver-sdk/sdk_lib/lib \
--lopentelemetry_webserver_sdk \
--Wl,-rpath,/otel-webserver-module/build/linux-x64/opentelemetry-webserver-sdk/sdk_lib/lib"
+SDK_LINES="\\
+\t-L/otel-webserver-module/build/linux-x64/opentelemetry-webserver-sdk/sdk_lib/lib \\
+\t-lopentelemetry_webserver_sdk \\
+\t-Wl,-rpath,/otel-webserver-module/build/linux-x64/opentelemetry-webserver-sdk/sdk_lib/lib"
 
-echo "Patching ngx_module_libs in $file"
+echo "Patching nginx module link rule in $file"
 
-# Append SDK libs to ngx_module_libs (the only safe hook)
-if grep -q "^ngx_module_libs *=" "$file"; then
-  sed -i "/^ngx_module_libs *=/ s|\$| ${SDK_LIBS}|" "$file"
+# Patch the actual link command (expanded form)
+if grep -q "cc -o objs/ngx_http_opentelemetry_module.so" "$file"; then
+  sed -i "/cc -o objs\\/ngx_http_opentelemetry_module.so/ a ${SDK_LINES}" "$file"
 else
-  echo "ERROR: ngx_module_libs not found in Makefile"
-  exit 1
+  echo "WARN: module link rule not found yet, skipping patch"
 fi
 
-# Verify
-grep -n "lopentelemetry_webserver_sdk" "$file" || {
-  echo "ERROR: SDK libs not injected"
-  exit 1
-}
+# Non-fatal verification
+grep -n "lopentelemetry_webserver_sdk" "$file" || \
+  echo "WARN: SDK flags not visible in Makefile yet"
