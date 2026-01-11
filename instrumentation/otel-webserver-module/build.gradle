@@ -232,37 +232,43 @@ nginxSupportedVersions.each { nginxVersion ->
     }
 
     task("configureNginx${nginxVersion}", type: Exec) {
-        group = 'OpenTelemetry module for Nginx'
-        description = 'Run configure to generate the build files for OpenTelemetry Module for Nginx'
+    group = 'OpenTelemetry module for Nginx'
+    description = 'Run configure to generate the build files for OpenTelemetry Module for Nginx'
 
-        dependsOn "extractNginx${nginxVersion}"
-        workingDir "${buildDir}/nginx-${nginxVersion}"
-        commandLine './configure', "--with-compat", "--with-cc-opt=-Wno-error -Wno-unused-variable -Wno-unused-but-set-variable", "--with-ld-opt=-L${libraryStageDir}/sdk_lib/lib", "--add-dynamic-module=${projectDir}/src/nginx"
+    dependsOn "extractNginx${nginxVersion}"
+    workingDir "${buildDir}/nginx-${nginxVersion}"
+
+    commandLine './configure',
+        "--with-compat",
+        "--with-cc-opt=-Wno-error -Wno-unused-variable -Wno-unused-but-set-variable",
+        "--with-ld-opt=-L${libraryStageDir}/sdk_lib/lib -lopentelemetry_webserver_sdk -Wl,-rpath,${libraryStageDir}/sdk_lib/lib",
+        "--add-dynamic-module=${projectDir}/src/nginx"
     }
 
-    task("delMakefile${nginxVersion}", type: Exec) {
-        group = 'OpenTelemetry module for Nginx'
-        description = 'Deleting old Makefile'
 
-        workingDir "${buildDir}/nginx-${nginxVersion}/objs"
-        commandLine 'rm', '-rf', 'Makefile'
-    }
+    // task("delMakefile${nginxVersion}", type: Exec) {
+    //     group = 'OpenTelemetry module for Nginx'
+    //     description = 'Deleting old Makefile'
 
-    task("copyMakefile${nginxVersion}", type: Copy) {
-        group = 'OpenTelemetry module for Nginx'
-        description = 'Copying Makefile for compiling Nginx Web Server Agent'
+    //     workingDir "${buildDir}/nginx-${nginxVersion}/objs"
+    //     commandLine 'rm', '-rf', 'Makefile'
+    // }
 
-        dependsOn "delMakefile${nginxVersion}"
-        from "src/nginx/Makefile"
-        into "${buildDir}/nginx-${nginxVersion}/objs/"
-    }
+    // task("copyMakefile${nginxVersion}", type: Copy) {
+    //     group = 'OpenTelemetry module for Nginx'
+    //     description = 'Copying Makefile for compiling Nginx Web Server Agent'
 
-    task("updateMakefile${nginxVersion}", type: Exec) {
-        group = 'OpenTelemetry module for Nginx'
-        description = 'Updating the Makefile for dynamic build'
+    //     dependsOn "delMakefile${nginxVersion}"
+    //     from "src/nginx/Makefile"
+    //     into "${buildDir}/nginx-${nginxVersion}/objs/"
+    // }
 
-        commandLine 'bash', '-c', "src/nginx/script.sh ${buildDir}/nginx-${nginxVersion}/objs/Makefile"
-    }
+    // task("updateMakefile${nginxVersion}", type: Exec) {
+    //     group = 'OpenTelemetry module for Nginx'
+    //     description = 'Updating the Makefile for dynamic build'
+
+    //     commandLine 'bash', '-c', "src/nginx/script.sh ${buildDir}/nginx-${nginxVersion}/objs/Makefile"
+    // }
 
     task("buildNginxModule${nginxVersion}",type: Exec) {
         group = 'OpenTelemetry module for Nginx'
