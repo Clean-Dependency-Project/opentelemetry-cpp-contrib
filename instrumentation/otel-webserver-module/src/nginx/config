@@ -1,16 +1,20 @@
 ngx_addon_name=ngx_http_opentelemetry_module
 
 if test -n "$ngx_module_link"; then
-  ngx_module_type=HTTP
-  ngx_module_name=ngx_http_opentelemetry_module
-  ngx_module_srcs="	\
-  					$ngx_addon_dir/ngx_http_opentelemetry_log.c \
-  					$ngx_addon_dir/ngx_http_opentelemetry_module.c"
-  . auto/module
+    ngx_module_type=HTTP
+    ngx_module_name=ngx_http_opentelemetry_module
+
+    ngx_module_srcs=" \
+        $ngx_addon_dir/ngx_http_opentelemetry_log.c \
+        $ngx_addon_dir/ngx_http_opentelemetry_module.c"
+
+    # 🔑 REQUIRED for dynamic module linking
+    ngx_module_libs="$ngx_module_libs -lopentelemetry_webserver_sdk"
+
+    . auto/module
 else
-	HTTP_MODULES="$HTTP_MODULES ngx_http_opentelemetry_module"
-	NGX_ADDON_SRCS="$NGX_ADDON_SRCS \
-					$ngx_addon_dir/ngx_http_opentelemetry_log.c \
-					$ngx_addon_dir/ngx_http_opentelemetry_module.c"
+    HTTP_MODULES="$HTTP_MODULES ngx_http_opentelemetry_module"
+    NGX_ADDON_SRCS="$NGX_ADDON_SRCS \
+        $ngx_addon_dir/ngx_http_opentelemetry_log.c \
+        $ngx_addon_dir/ngx_http_opentelemetry_module.c"
 fi
-CORE_LIBS="-lopentelemetry_webserver_sdk $CORE_LIBS"
