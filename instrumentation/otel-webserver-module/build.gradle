@@ -238,11 +238,13 @@ nginxSupportedVersions.each { nginxVersion ->
     dependsOn "extractNginx${nginxVersion}"
     workingDir "${buildDir}/nginx-${nginxVersion}"
 
-    commandLine './configure',
-        "--with-compat",
-        "--with-cc-opt=-Wno-error -Wno-unused-variable -Wno-unused-but-set-variable",
-        "--with-ld-opt=-L${libraryStageDir}/sdk_lib/lib -lopentelemetry_webserver_sdk -Wl,-rpath,${libraryStageDir}/sdk_lib/lib",
-        "--add-dynamic-module=${projectDir}/src/nginx"
+    commandLine 'bash', '-c', """
+        ./configure \
+          --with-compat \
+          --with-cc-opt="-Wno-error -Wno-unused-variable -Wno-unused-but-set-variable" \
+          --with-ld-opt="-L${libraryStageDir}/sdk_lib/lib -lopentelemetry_webserver_sdk -Wl,-rpath,${libraryStageDir}/sdk_lib/lib" \
+          --add-dynamic-module=${projectDir}/src/nginx
+    """
     }
 
 
