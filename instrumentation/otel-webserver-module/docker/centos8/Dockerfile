@@ -198,8 +198,20 @@ RUN set -eux; \
   cp -v /dependencies/opentelemetry/${OPENTELEMETRY_VERSION}/lib/libopentelemetry_*.so "${SDK_LIB_DIR}/" || true; \
   cp -v /usr/local/lib/libopentelemetry_*.so "${SDK_LIB_DIR}/" || true; 
 
+# ---- Bundle gRPC / Protobuf runtime deps ----
+RUN set -eux; \
+  SDK_LIB_DIR="/opt/opentelemetry-webserver-sdk/sdk_lib/lib"; \
+  for lib in \
+    libgrpc++.so* \
+    libgrpc.so* \
+    libprotobuf.so* \
+    libabsl_*.so* \
+    libc-ares.so* \
+  ; do \
+    find /usr/lib /lib -name "$lib" -exec cp -v {} "${SDK_LIB_DIR}/" \; || true; \
+  done
+
 COPY entrypoint.sh /usr/local/bin/
 ENTRYPOINT ["entrypoint.sh"]
-ENV LD_LIBRARY_PATH=/opt/opentelemetry-webserver-sdk/sdk_lib/lib:$LD_LIBRARY_PATH
-ENV LD_PRELOAD=/opt/opentelemetry-webserver-sdk/sdk_lib/lib/libopentelemetry_webserver_sdk.so
+
 

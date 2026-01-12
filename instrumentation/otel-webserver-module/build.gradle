@@ -14,6 +14,18 @@ project.ext {
     // To do a 32-bit build, pass "-Dos.arch=x86"
     platBuildDir = "${buildDir}/${osName}-${osArch}"
     modDepDir = "${platBuildDir}/module-dependencies"
+    
+    SYSTEM_LIB_DIRS = [
+    "/usr/lib/x86_64-linux-gnu",
+    "/lib/x86_64-linux-gnu"
+    ]
+    GRPC_RUNTIME_LIBS = [
+    "libgrpc.so*",
+    "libgpr.so*",
+    "libupb.so*",
+    "libaddress_sorting.so*",
+    "libre2.so*"
+    ]
 
     debug = false
     if (buildType != 'release') {
@@ -183,7 +195,22 @@ task stageLibrary(type: Copy) {
     from(buildLibrary) { it.into "sdk_lib/lib" }
     from("${platBuildDir}/out/Default/libopentelemetry_webserver_sdk.so") { it.into "sdk_lib/lib" }
     from("${modDepDir}/opentelemetry/${cppSDKVersion}/lib/") { it.into "sdk_lib/lib" }
-    
+    SYSTEM_LIB_DIRS.each { libDir ->
+        from(libDir) {
+            include "libgrpc*.so*"
+            include "libprotobuf.so*"
+            include "libabsl_*.so*"
+            include "libcares.so*"
+            it.into "sdk_lib/lib"
+        }
+    }
+    // ---- gRPC / Protobuf / re2 runtime deps ----
+    SYSTEM_LIB_DIRS.each { dir ->
+        from(dir) {
+            include GRPC_RUNTIME_LIBS
+            into "sdk_lib/lib"
+        }
+    }
     from("dist/opentelemetry_sdk_log4cxx.xml.template") { it.into "conf" }
     from("dist/install.${scriptExt}") { it.fileMode 0700 }
 
@@ -236,13 +263,18 @@ nginxSupportedVersions.each { nginxVersion ->
     description = 'Run configure to generate the build files for OpenTelemetry Module for Nginx'
 
     dependsOn "extractNginx${nginxVersion}"
+    dependsOn stageLibrary
+
     workingDir "${buildDir}/nginx-${nginxVersion}"
 
-    commandLine './configure',
-        "--with-compat",
-        "--with-cc-opt=-Wno-error -Wno-unused-variable -Wno-unused-but-set-variable",
-        "--with-ld-opt=-L${libraryStageDir}/sdk_lib/lib -lopentelemetry_webserver_sdk -Wl,-rpath,${libraryStageDir}/sdk_lib/lib",
-        "--add-dynamic-module=${projectDir}/src/nginx"
+    commandLine 'bash', '-c', """
+        ./configure \
+          --with-compat \
+          --with-cc-opt="-Wno-error -Wno-unused-variable -Wno-unused-but-set-variable" \
+          --with-ld-opt="-L${libraryStageDir}/sdk_lib/lib" \
+          --with-ld-opt="-Wl,-rpath,${libraryStageDir}/sdk_lib/lib" \
+          --add-dynamic-module=${projectDir}/src/nginx
+    """
     }
 
 

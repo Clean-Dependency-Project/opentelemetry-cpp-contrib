@@ -1,16 +1,25 @@
 ngx_addon_name=ngx_http_opentelemetry_module
 
+SDK_LIB_DIR="/otel-webserver-module/build/linux-x64/opentelemetry-webserver-sdk/sdk_lib/lib"
+
 if test -n "$ngx_module_link"; then
-  ngx_module_type=HTTP
-  ngx_module_name=ngx_http_opentelemetry_module
-  ngx_module_srcs="	\
-  					$ngx_addon_dir/ngx_http_opentelemetry_log.c \
-  					$ngx_addon_dir/ngx_http_opentelemetry_module.c"
-  . auto/module
+    ngx_module_type=HTTP
+    ngx_module_name=ngx_http_opentelemetry_module
+
+    ngx_module_srcs=" \
+        $ngx_addon_dir/ngx_http_opentelemetry_log.c \
+        $ngx_addon_dir/ngx_http_opentelemetry_module.c"
+
+    # 🔑 REQUIRED: link + search path + runtime path
+    ngx_module_libs="$ngx_module_libs \
+        -L${SDK_LIB_DIR} \
+        -lopentelemetry_webserver_sdk \
+        -Wl,-rpath,${SDK_LIB_DIR}"
+
+    . auto/module
 else
-	HTTP_MODULES="$HTTP_MODULES ngx_http_opentelemetry_module"
-	NGX_ADDON_SRCS="$NGX_ADDON_SRCS \
-					$ngx_addon_dir/ngx_http_opentelemetry_log.c \
-					$ngx_addon_dir/ngx_http_opentelemetry_module.c"
+    HTTP_MODULES="$HTTP_MODULES ngx_http_opentelemetry_module"
+    NGX_ADDON_SRCS="$NGX_ADDON_SRCS \
+        $ngx_addon_dir/ngx_http_opentelemetry_log.c \
+        $ngx_addon_dir/ngx_http_opentelemetry_module.c"
 fi
-CORE_LIBS="-lopentelemetry_webserver_sdk $CORE_LIBS"
